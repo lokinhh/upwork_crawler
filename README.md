@@ -70,7 +70,7 @@ python -m upwork.main
 
 ## Chạy bằng Docker Compose
 
-Stack: **FlareSolverr** + **9Router** (build từ `./9router`) + **crawler** (`Dockerfile.crawler`).
+Stack: **FlareSolverr** + **9Router** (image `ghcr.io/decolua/9router:latest`) + **crawler** (`Dockerfile.crawler`).
 
 ```bash
 cp .env.example .env
@@ -79,7 +79,7 @@ docker compose up -d --build
 ```
 
 - FlareSolverr: `http://localhost:8191`
-- 9Router: `http://localhost:20128` — cấu hình thêm trong `9router/.env` nếu cần (xem `docker-compose.yml` và ghi chú trong repo 9Router).
+- 9Router: `http://localhost:20128` — biến dịch vụ nằm trong `docker-compose.yml` (`ninerouter.environment`); có thể ghi đè qua `.env` gốc (tiền tố `NINEROUTER_*`, xem `.env.example`).
 - Volume: `crawler_data` (seen + subscribers), `crawler_auth` (`.auth` trong container), mount `./logs` → `/app/logs`.
 
 ## Cấu trúc thư mục (gỡ lỗi)

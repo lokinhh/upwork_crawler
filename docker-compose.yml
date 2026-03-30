@@ -4,7 +4,7 @@
 #   cp .env.example .env
 #   # Dien TELEGRAM_BOT_TOKEN, UPWORK_SEARCH_KEYWORD, NINEROUTER_MODEL (va/hoac Gemini/OpenRouter neu can)
 #   # Model/key 9Router: dat trong .env (NINEROUTER_MODEL, NINEROUTER_API_KEY). Compose chi ghi de BASE_URL -> ninerouter:20128
-#   # 9Router dashboard: xem 9router/README.md — co the can ./9router/.env cho OAuth mat khau, v.v.
+#   # 9Router: bien ghi de trong `ninerouter.environment` hoac file `.env` goc (NINEROUTER_*), xem 9router/README.md
 #
 # Chay:
 #   docker compose up -d --build
@@ -26,24 +26,32 @@ services:
       LOG_LEVEL: info
     restart: unless-stopped
 
+  # Image: https://github.com/users/decolua/packages/container/package/9router — có thể ghim tag (vd. :3cf900a) thay vì :latest
   ninerouter:
-    build:
-      context: ./9router
-      dockerfile: Dockerfile
+    image: ghcr.io/decolua/9router:latest
     container_name: upwork-ninerouter
-    env_file:
-      - ./9router/.env
     environment:
-      # Ghi de DATA_DIR trong .env — /var/lib/9router can root; volume gan vao /app/data
+      # DATA_DIR: volume ninerouter_data -> /app/data (khong dung ~/.9router trong image)
       DATA_DIR: /app/data
+      PORT: "20128"
+      NODE_ENV: production
+      JWT_SECRET: ${NINEROUTER_JWT_SECRET:-change-me-to-a-long-random-secret}
+      INITIAL_PASSWORD: ${NINEROUTER_INITIAL_PASSWORD:-change-me}
+      API_KEY_SECRET: ${NINEROUTER_API_KEY_SECRET:-endpoint-proxy-api-key-secret}
+      MACHINE_ID_SALT: ${NINEROUTER_MACHINE_ID_SALT:-endpoint-proxy-salt}
+      ENABLE_REQUEST_LOGS: "false"
+      OBSERVABILITY_ENABLED: "true"
+      AUTH_COOKIE_SECURE: "false"
+      REQUIRE_API_KEY: "false"
+      BASE_URL: ${NINEROUTER_APP_BASE_URL:-http://localhost:20128}
+      CLOUD_URL: ${NINEROUTER_CLOUD_URL:-https://9router.com}
+      NEXT_PUBLIC_BASE_URL: ${NINEROUTER_NEXT_PUBLIC_BASE_URL:-http://localhost:20128}
+      NEXT_PUBLIC_CLOUD_URL: ${NINEROUTER_NEXT_PUBLIC_CLOUD_URL:-https://9router.com}
     ports:
       - "20128:20128"
     volumes:
       - ninerouter_data:/app/data
     restart: unless-stopped
-    # Them bien 9Router (INITIAL_PASSWORD, OAuth, ...) bang file env rieng:
-    # env_file:
-    #   - ./9router/.env
 
   crawler:
     build:
