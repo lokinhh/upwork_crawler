@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+# Repo-root only — unanchored lib/dist/var/ would ignore 9router/src/lib, etc.
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+.venv/
+venv/
+ENV/
+env/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets & local config
+.env
+.env.local
+.env.*.local
+!.env.example
+login.env
+curl.env
+.auth/
+
+# Logs & debug artifacts
+logs/
+*.log
+login_debug*.log
+login_form_stuck_*.html
+login_form_stuck_*.png
+captures/
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Docker (optional local overrides)
+docker-compose.override.yml

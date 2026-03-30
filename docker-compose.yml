@@ -1,0 +1,87 @@
+# Upwork scanner stack: FlareSolverr + 9Router + Python crawler
+#
+# Chuan bi:
+#   cp .env.example .env
+#   # Dien TELEGRAM_BOT_TOKEN, UPWORK_SEARCH_KEYWORD, NINEROUTER_MODEL (va/hoac Gemini/OpenRouter neu can)
+#   # Model/key 9Router: dat trong .env (NINEROUTER_MODEL, NINEROUTER_API_KEY). Compose chi ghi de BASE_URL -> ninerouter:20128
+#   # 9Router dashboard: xem 9router/README.md — co the can ./9router/.env cho OAuth mat khau, v.v.
+#
+# Chay:
+#   docker compose up -d --build
+#
+# Luu y: volume crawler_auth gan /app/.auth — giu storage_state.json sau restart.
+# Neu truoc day khong co volume nay, moi lan start container moi phai login lai.
+#
+# Truy cap:
+#   FlareSolverr: http://localhost:8191
+#   9Router:      http://localhost:20128
+#
+services:
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: upwork-flaresolverr
+    ports:
+      - "8191:8191"
+    environment:
+      LOG_LEVEL: info
+    restart: unless-stopped
+
+  ninerouter:
+    build:
+      context: ./9router
+      dockerfile: Dockerfile
+    container_name: upwork-ninerouter
+    env_file:
+      - ./9router/.env
+    environment:
+      # Ghi de DATA_DIR trong .env — /var/lib/9router can root; volume gan vao /app/data
+      DATA_DIR: /app/data
+    ports:
+      - "20128:20128"
+    volumes:
+      - ninerouter_data:/app/data
+    restart: unless-stopped
+    # Them bien 9Router (INITIAL_PASSWORD, OAuth, ...) bang file env rieng:
+    # env_file:
+    #   - ./9router/.env
+
+  crawler:
+    build:
+      context: .
+      dockerfile: Dockerfile.crawler
+    container_name: upwork-crawler
+    # Playwright/Chromium: tránh crash khi headless (tuỳ máy có thể bỏ)
+    shm_size: "1gb"
+    env_file:
+      - .env
+    environment:
+      # Noi bo Docker — ghi de FLARESOLVERR_URL trong .env (localhost khong dung trong mang container)
+      FLARESOLVERR_URL: http://flaresolverr:8191
+      # BASE_URL bat buoc host noi bo; MODEL + API_KEY lay tu file .env cung thu muc (thay the ${...})
+      NINEROUTER_BASE_URL: http://ninerouter:20128
+      NINEROUTER_MODEL: ${NINEROUTER_MODEL:-cc/claude-opus-4-6}
+      NINEROUTER_API_KEY: ${NINEROUTER_API_KEY:-sk_9router}
+      SEEN_STORE_PATH: /app/data/.seen_jobs.json
+      TELEGRAM_SUBSCRIBERS_STORE_PATH: /app/data/.telegram_subscribers.json
+      # Trùng volume bên dưới — login lưu storage_state.json; không mount = mỗi lần recreate container phải login lại
+      UPWORK_AUTH_DIR: /app/.auth
+      LOG_DIR: /app/logs
+      UPWORK_LOG_DIR: /app/logs
+    volumes:
+      - crawler_data:/app/data
+      - crawler_auth:/app/.auth
+      - ./logs:/app/logs
+      # Logs persist ra host: ./logs
+      # Tuỳ chọn: thay volume bằng thư mục host (dễ sửa bearer) — mkdir .auth trước
+      # - ./.auth:/app/.auth
+      # Neu dung Gemini + file key: tao api_key_gemini.txt roi bo comment dong duoi
+      # - ./api_key_gemini.txt:/app/api_key_gemini.txt:ro
+    depends_on:
+      - flaresolverr
+      - ninerouter
+    restart: unless-stopped
+
+volumes:
+  ninerouter_data:
+  crawler_data:
+  crawler_auth:

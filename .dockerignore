@@ -1,0 +1,13 @@
+.venv
+venv
+__pycache__
+*.py[cod]
+.git
+.gitignore
+*.md
+.env
+.env.*
+9router/node_modules
+9router/.next
+9router/data
+*.html

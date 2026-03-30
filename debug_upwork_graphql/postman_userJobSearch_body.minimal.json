@@ -1,0 +1,14 @@
+{
+  "query": "\n  query UserJobSearch($requestVariables: UserJobSearchV1Request!) {\n    search {\n      universalSearchNuxt {\n        userJobSearchV1(request: $requestVariables) {\n          paging {\n            total\n            offset\n            count\n          }\n          results {\n            id\n            title\n          }\n        }\n      }\n    }\n  }\n",
+  "variables": {
+    "requestVariables": {
+      "userQuery": "spring boot",
+      "sort": "relevance+desc",
+      "highlight": false,
+      "paging": {
+        "offset": 0,
+        "count": 10
+      }
+    }
+  }
+}

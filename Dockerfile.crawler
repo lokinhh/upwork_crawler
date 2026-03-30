@@ -1,0 +1,19 @@
+FROM python:3.11-slim-bookworm
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY requirements.txt .
+# Playwright: thư viện + dependency hệ thống + Chromium (login Upwork)
+RUN pip install --no-cache-dir -r requirements.txt \
+    && python -m playwright install-deps \
+    && python -m playwright install chromium
+
+COPY upwork ./upwork
+
+# Luu .seen_jobs.json / subscribers trong /app/data (volume trong compose)
+RUN mkdir -p /app/data
+
+CMD ["python", "-m", "upwork.main"]

@@ -1,0 +1,6 @@
+captures/
+.auth/
+curl.env
+login.env
+login_debug*.log
+__pycache__/
