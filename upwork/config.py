@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 
 def _project_root() -> Path:
-    """Thư mục gối project (cha của package `upwork`)."""
+    """Project root directory (parent of package `upwork`)."""
     return Path(__file__).resolve().parent.parent
 
 
@@ -29,7 +29,7 @@ class Config:
     seen_store_path: str = ".seen_jobs.json"
     telegram_subscribers_store_path: str = ".telegram_subscribers.json"
     gemini_model: str = "gemini-2.0-flash"
-    # --- Upwork fetch (chỉ GraphQL + FlareSolverr + .auth; không còn HTML scrape) ---
+    # --- Upwork fetch (GraphQL + FlareSolverr + .auth only; HTML scrape removed) ---
     upwork_fetch_mode: str = "auto"
     upwork_auth_dir: Path = field(default_factory=lambda: _project_root() / ".auth")
     upwork_auto_login: bool = False
@@ -43,15 +43,15 @@ class Config:
 
     def resolved_fetch_mode(self) -> Literal["graphql"]:
         """
-        Luôn GraphQL (FlareSolverr warm + requests POST userJobSearch).
-        `UPWORK_FETCH_MODE=html` hoặc `auto` đều được coi là graphql — nhánh HTML đã gỡ.
+        Always GraphQL (FlareSolverr warm-up + requests POST userJobSearch).
+        `UPWORK_FETCH_MODE=html` and `auto` are both treated as graphql - HTML branch removed.
         """
         m = (self.upwork_fetch_mode or "auto").strip().lower()
         if m == "html":
             import logging
 
             logging.getLogger("upwork.config").warning(
-                "UPWORK_FETCH_MODE=html không còn — chỉ GraphQL. Bỏ biến hoặc đặt graphql/auto."
+                "UPWORK_FETCH_MODE=html is no longer supported - GraphQL only. Remove it or set graphql/auto."
             )
         return "graphql"
 
@@ -88,9 +88,9 @@ class Config:
         has_openrouter = bool(or_key and or_model)
         if not (has_gemini or has_ninerouter or has_openrouter):
             raise ValueError(
-                "Cần ít nhất một backend tóm tắt: GEMINI_API_KEY, "
-                "hoặc NINEROUTER_API_KEY + NINEROUTER_MODEL, "
-                "hoặc OPENROUTER_API_KEY + OPENROUTER_MODEL."
+                "At least one summary backend is required: GEMINI_API_KEY, "
+                "or NINEROUTER_API_KEY + NINEROUTER_MODEL, "
+                "or OPENROUTER_API_KEY + OPENROUTER_MODEL."
             )
 
         auth_dir_raw = os.getenv("UPWORK_AUTH_DIR", "").strip()

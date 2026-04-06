@@ -1,40 +1,40 @@
 #!/usr/bin/env python3
 """
-Debug: mở Brave (cửa sổ thật), đăng nhập tay, rồi bắt POST
+Debug: open Brave (real window), log in manually, then initiate POST
   https://www.upwork.com/api/graphql/v1?alias=userJobSearch
 
-Script **không “tính” hay lấy token** — token OAuth2 (`oauth2v2_int_…`) do **ứng dụng web Upwork**
-(JS/Nuxt) đặt vào **cookie** (và đôi khi dùng trong bộ nhớ) sau khi đăng nhập; khi gọi GraphQL,
-fetch/XHR gắn header `Authorization: Bearer …`. Ta chỉ **quan sát** request đã gửi.
-Để biết Bearer trùng **tên cookie nào**: bật `DEBUG_TOKEN_MAP=1` — sẽ log (an toàn) tên cookie
-khớp với giá trị Bearer, không in full token.
+Script **does not “count” or retrieve tokens** — OAuth2 token (`oauth2v2_int_…`) issued by **Upwork web app**
+(JS/Nuxt) placed in **cookie** (and sometimes used in memory) after login; when calling GraphQL,
+fetch/XHR attaches the `Authorization: Bearer …` header. We just **observe** the sent request.
+To know which Bearer matches **which cookie name**: turn on `DEBUG_TOKEN_MAP=1` — will log (safely) the cookie name
+matches the Bearer value, does not print the full token.
 
-Phiên đăng nhập được lưu vào file storage_state (cookie + localStorage)
-để lần sau không cần đăng nhập lại (trừ khi Upwork hết hạn phiên).
+Login session is saved to file storage_state (cookie + localStorage)
+so you don't need to log in again next time (unless Upwork expires the session).
 
-Chạy:
+Run:
   cd debug_upwork_graphql
-  python -m venv .venv && source .venv/bin/activate   # tùy chọn
+  python -m venv .venv && source .venv/bin/activate # options
   pip install -r requirements.txt
   python capture_user_job_search.py
 
-Biến môi trường:
+Environment variables:
   BRAVE_EXECUTABLE       — binary Brave
-  UPWORK_START_URL       — trang mở đầu
-  UPWORK_STORAGE_STATE   — file JSON Playwright (mặc định: .auth/storage_state.json)
-  UPWORK_DEBUG_LOG       — file log chi tiết: đường dẫn tùy chọn; để trống = tự tạo
-                           captures/debug_session_<UTC_ts>.log ; 0/off = không ghi file
-  SAVE_REQUEST_JSON      — "1" ghi thêm file JSON request riêng trong captures/
-  STORAGE_SAVE_INTERVAL  — giây, lưu phiên định kỳ (mặc định 120, 0 = tắt)
-  DEBUG_UPWORK_CONSOLE   — "1" in console.log từ trang
-  DEBUG_LOG_SENSITIVE    — "1" in nguyên cookie/authorization (cực kỳ không nên commit log)
-  DEBUG_TOKEN_MAP        — "1" khi có userJobSearch: log tên cookie khớp Bearer + gợi ý localStorage (không in token)
-  UPWORK_AUTO_AUTH_CONFIG — mặc định bật khi DEBUG_TOKEN_MAP=1: ghi bearer_cookie vào .auth/auth_config.json
-                           từ kết quả exact (ưu tiên *fsb/*esb). Đặt 0/false để tắt.
-  UPWORK_PAGE_CLOSE_TIMEOUT_MS — chờ đóng tab (ms). 0 = không giới hạn (mặc định).
-                           Playwright mặc định 30s nếu không set → dễ timeout khi còn dùng trình duyệt.
+  UPWORK_START_URL — opening page
+  UPWORK_STORAGE_STATE — JSON Playwright file (default: .auth/storage_state.json)
+  UPWORK_DEBUG_LOG — detailed log file: optional path; leave blank = create your own
+                           captures/debug_session_<UTC_ts>.log ; 0/off = do not write file
+  SAVE_REQUEST_JSON — "1" adds a separate request JSON file in captures/
+  STORAGE_SAVE_INTERVAL — seconds, save sessions periodically (default 120, 0 = off)
+  DEBUG_UPWORK_CONSOLE — "1" prints console.log from page
+  DEBUG_LOG_SENSITIVE — "1" prints cookies/authorization (commit log is strongly not recommended)
+  DEBUG_TOKEN_MAP — "1" when userJobSearch exists: log cookie name matching Bearer + localStorage hint (no token printed)
+  UPWORK_AUTO_AUTH_CONFIG — enabled by default when DEBUG_TOKEN_MAP=1: write bearer_cookie to .auth/auth_config.json
+                           from exact results (prefer *fsb/*esb). Set 0/false to disable.
+  UPWORK_PAGE_CLOSE_TIMEOUT_MS — wait for tab to close (ms). 0 = unlimited (default).
+                           Playwright defaults to 30 seconds if not set → easily timeout while still using the browser.
 
-Không commit captures/ và .auth/ — chứa session và log.
+Do not commit captures/ and .auth/ — contain sessions and logs.
 """
 from __future__ import annotations
 
@@ -90,7 +90,7 @@ def log(msg: str) -> None:
 
 
 def detail(text: str, *, stdout_limit: int = 24_000) -> None:
-    """Ghi đầy đủ vào file log; stdout có thể cắt (mặc định 24k ký tự)."""
+    """Full write to log file; stdout can be truncated (default 24k characters)."""
     if _log_sink:
         _log_sink.write(text)
         if not text.endswith("\n"):
@@ -238,7 +238,7 @@ def _parse_interval() -> float:
 
 
 def _page_close_timeout_ms() -> float:
-    """0 = không timeout (chờ đóng tab vô hạn). Mặc định 0 — tránh lỗi 30s của Playwright."""
+    """0 = no timeout (wait for tab closure indefinitely). Default 0 — avoids Playwright's 30s error."""
     raw = os.environ.get("UPWORK_PAGE_CLOSE_TIMEOUT_MS", "0").strip()
     try:
         v = float(raw)
@@ -252,7 +252,7 @@ def _env_truthy(name: str) -> bool:
 
 
 def _auto_auth_config_enabled() -> bool:
-    """Mặc định bật; UPWORK_AUTO_AUTH_CONFIG=0|false|no|off để không ghi .auth/auth_config.json."""
+    """Default on; UPWORK_AUTO_AUTH_CONFIG=0|false|no|off to not write .auth/auth_config.json."""
     raw = os.environ.get("UPWORK_AUTO_AUTH_CONFIG", "").strip().lower()
     if raw in ("0", "false", "no", "off"):
         return False
@@ -260,7 +260,7 @@ def _auto_auth_config_enabled() -> bool:
 
 
 async def _log_localstorage_oauth_keys(page) -> None:
-    """In danh sách key localStorage có vẻ liên quan oauth/token (chỉ tên key)."""
+    """Print a list of localStorage keys that appear to be oauth/token related (key names only)."""
     try:
         keys = await page.evaluate(
             """() => {
@@ -274,27 +274,27 @@ async def _log_localstorage_oauth_keys(page) -> None:
               return out;
             }"""
         )
-        log(f"[DEBUG_TOKEN_MAP] localStorage keys (lọc oauth|token|auth|session|bearer): {keys}")
+        log(f"[DEBUG_TOKEN_MAP] localStorage keys (filter oauth|token|auth|session|bearer): {keys}")
     except Exception as exc:
         log(f"[DEBUG_TOKEN_MAP] localStorage scan failed: {exc}")
 
 
 async def _log_bearer_cookie_map(request, context) -> None:
-    """So khớp giá trị Authorization Bearer với cookie trong context (chỉ log tên cookie)."""
+    """Match the Authorization Bearer value with the cookie in context (log the cookie name only)."""
     h = request.headers
     auth = h.get("authorization") or h.get("Authorization") or ""
     if not auth.lower().startswith("bearer "):
-        log("[DEBUG_TOKEN_MAP] không có Authorization: Bearer … trên request này")
+        log("[DEBUG_TOKEN_MAP] does not have Authorization: Bearer … on this request")
         return
     token = auth[7:].strip()
     cookies = await context.cookies()
     exact = [c["name"] for c in cookies if (c.get("value") or "") == token]
     contains = [c["name"] for c in cookies if token and token in (c.get("value") or "")]
     if exact:
-        log(f"[DEBUG_TOKEN_MAP] Bearer khớp **nguyên** giá trị các cookie: {exact}")
+        log(f"[DEBUG_TOKEN_MAP] Bearer matches **raw** cookie values: {exact}")
         log(
-            "[DEBUG_TOKEN_MAP] → Gợi ý: đặt auth_config bearer_cookie hoặc .auth/bearer.txt "
-            "theo một trong các tên trên nếu gọi API ngoài trình duyệt."
+            "[DEBUG_TOKEN_MAP] → Suggestion: set auth_config bearer_cookie or .auth/bearer.txt "
+            "by one of the above names if calling an external browser API."
         )
         if _auto_auth_config_enabled():
             try:
@@ -302,23 +302,23 @@ async def _log_bearer_cookie_map(request, context) -> None:
                 auth_dir = ROOT / ".auth"
                 if merge_auth_config_bearer_cookie(pick, auth_dir):
                     log(
-                        f"[AUTO_AUTH_CONFIG] đã cập nhật {auth_dir / 'auth_config.json'} "
+                        f"[AUTO_AUTH_CONFIG] updated {auth_dir / 'auth_config.json'}"
                         f"— bearer_cookie={pick!r}"
                     )
                 else:
                     log(
-                        f"[AUTO_AUTH_CONFIG] {auth_dir / 'auth_config.json'} đã có bearer_cookie={pick!r} "
-                        "(không ghi đè)"
+                        f"[AUTO_AUTH_CONFIG] {auth_dir / 'auth_config.json'} already has bearer_cookie={pick!r} "
+                        "(not overwritten)"
                     )
             except Exception as exc:
-                log(f"[AUTO_AUTH_CONFIG] không ghi auth_config: {exc!r}")
+                log(f"[AUTO_AUTH_CONFIG] not recording auth_config: {exc!r}")
     elif contains:
-        log(f"[DEBUG_TOKEN_MAP] Bearer là **phần** của giá trị cookie (substring): {contains}")
+        log(f"[DEBUG_TOKEN_MAP] Bearer is **part** of cookie value (substring): {contains}")
     else:
         log(
-            "[DEBUG_TOKEN_MAP] Bearer **không** trùng cookie HttpOnly nào trong storage_state — "
-            "thường do runtime JS ghép header (hoặc token chỉ trong memory). "
-            "Vẫn có thể copy Bearer từ request này (DEBUG_LOG_SENSITIVE=1) hoặc Network tab."
+            "[DEBUG_TOKEN_MAP] Bearer **doesn't** duplicate any HttpOnly cookies in storage_state — "
+            "usually caused by the JS runtime concatenating headers (or tokens in memory)."
+            "It is still possible to copy Bearer from this request (DEBUG_LOG_SENSITIVE=1) or Network tab."
         )
 
 
@@ -328,7 +328,7 @@ async def run() -> None:
     brave = _default_brave_executable()
     if not brave:
         print(
-            "Không tìm thấy Brave. Cài Brave hoặc set BRAVE_EXECUTABLE=/path/to/Brave Browser",
+            "Brave not found. Install Brave or set BRAVE_EXECUTABLE=/path/to/Brave Browser",
             file=sys.stderr,
         )
         raise SystemExit(1)
@@ -369,8 +369,8 @@ async def run() -> None:
                     log(f"load storage_state from {storage_path} ({_storage_stats(storage_path)})")
                 else:
                     log(
-                        f"no storage_state at {storage_path} — đăng nhập tay; "
-                        "phiên sẽ được lưu khi thoát hoặc theo chu kỳ."
+                        f"no storage_state at {storage_path} — manual login; "
+                        "session will be saved on exit or periodically."
                     )
 
                 context = await browser.new_context(**ctx_opts)
@@ -474,18 +474,18 @@ async def run() -> None:
 
                 log(f"Brave: {brave}")
                 log(f"open: {start_url}")
-                log("Vào Job search để trigger userJobSearch; JSON response trong captures/")
+                log("Go to Job search to trigger userJobSearch; JSON response in captures/")
                 if debug_token_map:
                     log(
-                        "DEBUG_TOKEN_MAP=1 — sẽ log tên cookie khớp Bearer (không in token). "
-                        "Script không sinh token; token do trang Upwork đặt cookie/JS."
+                        "DEBUG_TOKEN_MAP=1 — will log cookie names matching Bearer (not print token)."
+                        "Script does not generate tokens; tokens are set by Upwork site cookies/JS."
                     )
                     if _auto_auth_config_enabled():
                         log(
-                            "UPWORK_AUTO_AUTH_CONFIG (mặc định bật): khi có exact Bearer↔cookie, "
-                            "ghi bearer_cookie vào .auth/auth_config.json (tắt: UPWORK_AUTO_AUTH_CONFIG=0)."
+                            "UPWORK_AUTO_AUTH_CONFIG (default on): when exact Bearer↔cookie exists,"
+                            "write bearer_cookie to .auth/auth_config.json (off: UPWORK_AUTO_AUTH_CONFIG=0)."
                         )
-                log("Thoát: đóng tab/cửa sổ hoặc Ctrl+C (phiên vẫn được lưu trong finally).\n")
+                log("Exit: close tab/window or Ctrl+C (session is still saved in finally).\n")
 
                 await page.goto(start_url, wait_until="domcontentloaded")
                 log(f"goto done: {page.url}")
@@ -495,7 +495,7 @@ async def run() -> None:
                     log(f"waiting for page close (timeout {close_ms} ms)")
                     await page.wait_for_event("close", timeout=close_ms)
                 else:
-                    log("waiting for page close (no timeout — đóng tab khi xong)")
+                    log("waiting for page close (no timeout — close tab when done)")
                     await page.wait_for_event("close", timeout=0)
                 log("page closed")
             except asyncio.CancelledError:

@@ -1,11 +1,11 @@
 """
-Đọc cấu hình từ thư mục .auth/ (cùng cấp script):
-  - storage_state.json  (Playwright — bắt buộc để có cookie + token)
-  - auth_config.json      (tuỳ chọn: flaresolverr_url, warm_url, bearer_cookie, …)
+Read configuration from .auth/ folder (same script level):
+  - storage_state.json (Playwright — required to have cookie + token)
+  - auth_config.json (options: flaresolverr_url, warm_url, bearer_cookie, …)
 
-Bearer suy từ cookie: *fsb và *esb cùng hạng; cookie dạng chỉ số+sb (vd. 16366163sb) bị loại khỏi tự chọn.
-Nên đặt bearer_cookie trong auth_config.json theo DEBUG_TOKEN_MAP trong capture log.
-Biến môi trường UPWORK_*, FLARESOLVERR_* (nếu đã set) ghi đè giá trị từ file.
+Bearer infers from cookie: *fsb and *esb are of the same rank; cookies with index+sb (e.g. 16366163sb) are excluded from selection.
+Bearer_cookie should be set in auth_config.json according to DEBUG_TOKEN_MAP in the capture log.
+Environment variables UPWORK_*, FLARESOLVERR_* (if set) override the value from the file.
 """
 from __future__ import annotations
 
@@ -18,10 +18,10 @@ from typing import Any, Dict, List, Optional
 _AUTH_DIR = Path(__file__).resolve().parent / ".auth"
 
 _OAUTH2_STRICT = re.compile(r"^oauth2v2_int_[a-f0-9]{32}$")
-# vd. 16366163sb — kết thúc "sb" nhưng không phải client GraphQL *fsb/*esb; không tự dùng làm Bearer
+# eg. 16366163sb — "sb" ends but not GraphQL client *fsb/*esb; Do not use yourself as a Bearer
 _DIGIT_ONLY_SB = re.compile(r"^[0-9]+sb$", re.IGNORECASE)
 
-# Fallback sau cookie *sb — oauth2_global_js_token thường là client khác scope, dễ lỗi
+# Fallback after cookie *sb — oauth2_global_js_token is often a different client scope, prone to errors
 # "Requested oAuth2 client does not have permission to see some of the requested fields"
 _DEFAULT_BEARER_FALLBACK: List[str] = [
     "visitor_topnav_gql_token",
@@ -47,7 +47,7 @@ def _graphql_oauth_cookie_rank(name: str) -> int:
     s = str(name).lower()
     if _DIGIT_ONLY_SB.match(s):
         return 99
-    # *fsb và *esb cùng hạng. Các cookie *sb khác (hex+sb, vd. ab4bffa2sb) rank 1 — sau fsb/esb.
+    # *fsb and *esb are in the same class. Other *sb cookies (hex+sb, eg. ab4bffa2sb) rank 1 — after fsb/esb.
     if s.endswith("fsb") or s.endswith("esb"):
         return 0
     if s.endswith("sb"):
@@ -57,7 +57,7 @@ def _graphql_oauth_cookie_rank(name: str) -> int:
 
 def _pick_bearer_cookie_and_value(cookies: Dict[str, str], config: Dict[str, Any]) -> tuple[Optional[str], str]:
     """
-    Trả về (tên cookie hoặc None nếu bearer_full), và giá trị token (không có tiền tố Bearer).
+    Returns (cookie name or None if bearer_full), and token value (without Bearer prefix).
     """
     if config.get("bearer_full"):
         s = str(config["bearer_full"]).strip()
@@ -100,8 +100,8 @@ def _pick_bearer_cookie_and_value(cookies: Dict[str, str], config: Dict[str, Any
             return n, v
 
     raise ValueError(
-        "Không suy ra được Bearer từ cookies. Thêm vào .auth/auth_config.json "
-        "một trong: bearer_full, bearer_cookie, hoặc bearer_cookie_priority."
+        "Failed to infer Bearer from cookies. Add to .auth/auth_config.json "
+        "one of: bearer_full, bearer_cookie, or bearer_cookie_priority."
     )
 
 
@@ -114,7 +114,7 @@ def describe_authorization_source(
     auth_dir: Optional[Path] = None,
 ) -> str:
     """
-    Mô tả nguồn Bearer (để debug), không in toàn bộ token.
+    Bearer source description (for debugging), do not print the entire token.
     """
     base = Path(auth_dir) if auth_dir else _AUTH_DIR
     if os.environ.get("UPWORK_AUTHORIZATION", "").strip():
@@ -138,11 +138,11 @@ def describe_authorization_source(
 
 def preferred_graphql_bearer_cookie_name(candidates: List[str]) -> str:
     """
-    Khi DEBUG_TOKEN_MAP có nhiều cookie cùng giá trị Bearer — chọn tên phù hợp GraphQL
-    (cùng quy tắc _graphql_oauth_cookie_rank: *fsb/*esb trước, loại dạng chỉ số+sb).
+    When DEBUG_TOKEN_MAP has multiple cookies with the same Bearer value — choose a suitable GraphQL name
+    (same _graphql_oauth_cookie_rank rule: *fsb/*esb first, index type+sb).
     """
     if not candidates:
-        raise ValueError("candidates rỗng")
+        raise ValueError("empty candidates")
     uniq = list(dict.fromkeys(candidates))
     ranked = sorted(uniq, key=lambda n: (_graphql_oauth_cookie_rank(n), str(n)))
     return ranked[0]
@@ -153,8 +153,8 @@ def merge_auth_config_bearer_cookie(
     auth_dir: Optional[Path] = None,
 ) -> bool:
     """
-    Ghi/merge `bearer_cookie` vào `auth_dir/auth_config.json`; setdefault flaresolverr_url / warm_url nếu thiếu.
-    Trả về True nếu nội dung file thay đổi.
+    Write/merge `bearer_cookie` into `auth_dir/auth_config.json`; setdefault flaresolverr_url / warm_url if missing.
+    Returns True if the file content changes.
     """
     name = (cookie_name or "").strip()
     if not name:
@@ -188,7 +188,7 @@ def _tenant_id(cookies: Dict[str, str], config: Dict[str, Any]) -> str:
     if t:
         return t
     raise ValueError(
-        "Không có current_organization_uid trong cookie và không có tenant_id trong auth_config.json"
+        "There is no current_organization_uid in the cookie and no tenant_id in auth_config.json"
     )
 
 
@@ -201,7 +201,7 @@ def load_auth_config(auth_dir: Optional[Path] = None) -> Dict[str, Any]:
 
 
 def parse_cookie_header(header: str) -> Dict[str, str]:
-    """Chuỗi Cookie header -> dict name -> value."""
+    """String Cookie header -> dict name -> value."""
     out: Dict[str, str] = {}
     for part in header.split(";"):
         part = part.strip()
@@ -217,9 +217,9 @@ def resolve_authorization_header(
     auth_dir: Optional[Path] = None,
 ) -> str:
     """
-    Tính header Authorization từ map cookie (vd. sau khi merge với FlareSolverr).
+    Calculate the Authorization header from the cookie map (eg, after merging with FlareSolverr).
 
-    Thứ tự: UPWORK_AUTHORIZATION (env) > .auth/bearer.txt > auth_config + _pick_bearer_value.
+    Order: UPWORK_AUTHORIZATION (env) > .auth/bearer.txt > auth_config + _pick_bearer_value.
     """
     base = Path(auth_dir) if auth_dir else _AUTH_DIR
 
@@ -245,9 +245,9 @@ def resolve_authorization_header(
 
 def load_merged_auth(auth_dir: Optional[Path] = None) -> Dict[str, str]:
     """
-    Trả về:
-      authorization  — header Authorization (có tiền tố Bearer )
-      cookie         — chuỗi Cookie
+    Returns:
+      authorization — Authorization header (prefixed with Bearer )
+      cookie — Cookie string
       tenant_id
       flaresolverr_url
       warm_url
@@ -255,7 +255,7 @@ def load_merged_auth(auth_dir: Optional[Path] = None) -> Dict[str, str]:
     base = Path(auth_dir) if auth_dir else _AUTH_DIR
     storage_path = base / "storage_state.json"
     if not storage_path.is_file():
-        raise FileNotFoundError(f"Thiếu {storage_path} — chạy capture_user_job_search.py để tạo.")
+        raise FileNotFoundError(f"Missing {storage_path} — run capture_user_job_search.py ​​to create.")
 
     config = load_auth_config(base)
 
@@ -266,7 +266,7 @@ def load_merged_auth(auth_dir: Optional[Path] = None) -> Dict[str, str]:
     cookie_header = _cookie_header(cookies)
     tenant = _tenant_id(cookies, config)
 
-    # File một dòng — copy nguyên từ DevTools → Network → userJobSearch → Authorization (khi log đã redact)
+    # One-line file — copied from DevTools → Network → userJobSearch → Authorization (when log has been redacted)
     bearer_file = base / "bearer.txt"
     if bearer_file.is_file():
         raw_b = bearer_file.read_text(encoding="utf-8").strip()
@@ -288,7 +288,7 @@ def load_merged_auth(auth_dir: Optional[Path] = None) -> Dict[str, str]:
         or "https://www.upwork.com/nx/search/jobs/?q=spring%20boot&page=1"
     )
 
-    # Env ghi đè (ưu tiên sau cùng)
+    # Env override (last priority)
     if os.environ.get("UPWORK_AUTHORIZATION", "").strip():
         auth_header = os.environ["UPWORK_AUTHORIZATION"].strip()
         if not auth_header.lower().startswith("bearer "):

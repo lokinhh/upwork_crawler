@@ -1,11 +1,11 @@
 """
-GraphQL userJobSearch + FlareSolverr — logic đồng bộ với debug_upwork_graphql/graphql_via_flaresolverr.py.
+GraphQL userJobSearch + FlareSolverr - logic aligned with debug_upwork_graphql/graphql_via_flaresolverr.py.
 
-FlareSolverr: giải Cloudflare → merge cookie.
+FlareSolverr: solve Cloudflare -> merge cookies.
 requests: POST GraphQL.
 
-Scanner: chèn `userQuery` / paging / sort vào body (file JSON giống debug).
-403 (hoặc Challenge HTML): gọi lại login Playwright, tối đa `UPWORK_GRAPHQL_403_MAX_RETRIES` (mặc định 3).
+Scanner: inject `userQuery` / paging / sort into body (same JSON template as debug).
+403 (or Challenge HTML): re-run Playwright login, max `UPWORK_GRAPHQL_403_MAX_RETRIES` (default 3).
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ LOGGER = logging.getLogger("upwork.fetchers.graphql_search")
 
 GRAPHQL = "https://www.upwork.com/api/graphql/v1?alias=userJobSearch"
 
-# Giống graphql_via_flaresolverr.py
+# Same as graphql_via_flaresolverr.py
 _GRAPHQL_REFERER_FROM_CAPTURE = (
     "https://www.upwork.com/nx/search/jobs/"
     "?from_recent_search=true&q=spring%20boot&page=2"
@@ -53,7 +53,7 @@ def _package_data_dir() -> Path:
     return Path(__file__).resolve().parent.parent / "data"
 
 
-# Giống BODY_PATH / BODY_MINIMAL_PATH trong debug (tên file trong data/)
+# Same as BODY_PATH / BODY_MINIMAL_PATH in debug (files in data/)
 BODY_PATH = _package_data_dir() / "userJobSearch_body.json"
 BODY_MINIMAL_PATH = _package_data_dir() / "postman_userJobSearch_body.minimal.json"
 
@@ -128,7 +128,7 @@ def build_graphql_body_from_template(
     count: int,
     template_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    """Đọc JSON template (như debug), ghi đè requestVariables cho scanner."""
+    """Read JSON template (like debug), override requestVariables for scanner."""
     path = template_path or _resolve_body_path()
     raw = path.read_text(encoding="utf-8")
     body: Dict[str, Any] = json.loads(raw)
@@ -213,7 +213,7 @@ def _execute_graphql_once(
     body_json: str,
     timeout_ms: int,
 ) -> _GraphqlAttemptResult:
-    """Một vòng: warm FlareSolverr → merge → POST GraphQL (y hệt graphql_via_flaresolverr.main)."""
+    """One round: warm FlareSolverr -> merge -> POST GraphQL (same as graphql_via_flaresolverr.main)."""
     auth = load_merged_auth(auth_dir)
     fs = (
         os.environ.get("FLARESOLVERR_URL", "").strip()
@@ -300,7 +300,7 @@ def _execute_graphql_once(
     )
     if challenge:
         LOGGER.warning(
-            "Cloudflare/Upwork Challenge HTML (403) — thử login lại để làm mới phiên (nếu bật retry)."
+            "Cloudflare/Upwork Challenge HTML (403) - try login again to refresh session (if retry is enabled)."
         )
 
     payload: Optional[Dict[str, Any]] = None
@@ -317,7 +317,7 @@ def _execute_graphql_once(
         except json.JSONDecodeError:
             return None
 
-    # application/json hoặc body JSON (một số proxy đổi content-type)
+    # application/json or JSON body (some proxies alter content-type)
     if ct.startswith("application/json") or "json" in ct:
         try:
             out = gr.json()
@@ -338,7 +338,7 @@ def _execute_graphql_once(
             LOGGER.warning("GraphQL errors (HTTP %s): %s", gr.status_code, msg or err_summary[:400])
             if "oAuth2 client does not have permission" in msg:
                 LOGGER.warning(
-                    "Gợi ý: đặt bearer_cookie / bearer.txt khớp cookie OAuth — nguồn Bearer: %s",
+                    "Hint: set bearer_cookie / bearer.txt to match OAuth cookies - Bearer source: %s",
                     src,
                 )
         if _graphql_debug():
@@ -352,7 +352,7 @@ def _execute_graphql_once(
             LOGGER.info("GraphQL DEBUG body (truncated): %s", raw_text[:4000])
     else:
         LOGGER.warning(
-            "GraphQL không parse được JSON (HTTP %s, content-type=%r). body[:400]=%r",
+            "GraphQL JSON parse failed (HTTP %s, content-type=%r). body[:400]=%r",
             gr.status_code,
             gr.headers.get("content-type"),
             raw_text[:400],
@@ -404,12 +404,12 @@ def fetch_jobs_graphql(
     timeout_ms: int = 120_000,
 ) -> List[Dict[str, str]]:
     """
-    Gọi GraphQL với retry: 403 / Challenge / lỗi OAuth → login Playwright + lưu `.auth` (tối đa N lần).
-    Cần `config` có email/password để login lại.
+    Call GraphQL with retries: 403 / Challenge / OAuth errors -> Playwright login + save `.auth` (max N times).
+    Requires `config` email/password to re-login.
     """
     body_path = _resolve_body_path()
     if not body_path.is_file():
-        LOGGER.error("Thiếu file body GraphQL: %s", body_path)
+        LOGGER.error("Missing GraphQL body file: %s", body_path)
         return []
 
     body = build_graphql_body_from_template(
@@ -436,7 +436,7 @@ def fetch_jobs_graphql(
             if jobs:
                 if res.graphql_errors:
                     LOGGER.warning(
-                        "GraphQL có errors nhưng vẫn parse được %s job (partial success).",
+                        "GraphQL has errors but still parsed %s jobs (partial success).",
                         len(jobs),
                     )
                 return jobs
@@ -445,27 +445,27 @@ def fetch_jobs_graphql(
             if attempt < n - 1 and config and config.upwork_email and config.upwork_password:
                 if _should_relogin_after_result(res):
                     LOGGER.warning(
-                        "GraphQL errors, không có job — login lại lần %s/%s",
+                        "GraphQL errors with no jobs - re-login attempt %s/%s",
                         attempt + 1,
                         n,
                     )
                     try:
                         run_login_subprocess(config)
                     except Exception:
-                        LOGGER.exception("Login lại thất bại")
+                        LOGGER.exception("Re-login failed")
                         return []
                     continue
             LOGGER.warning(
-                "GraphQL không có job (HTTP=%s). errors=%s",
+                "GraphQL returned no jobs (HTTP=%s). errors=%s",
                 res.http_status,
-                (res.error_summary or "")[:600] or "xem log GraphQL errors phía trên",
+                (res.error_summary or "")[:600] or "see GraphQL error logs above",
             )
             return []
 
         if attempt < n - 1 and config and config.upwork_email and config.upwork_password:
             if _should_relogin_after_result(res):
                 LOGGER.warning(
-                    "HTTP %s / Challenge — login lại lần %s/%s",
+                    "HTTP %s / Challenge - re-login attempt %s/%s",
                     res.http_status or "?",
                     attempt + 1,
                     n,
@@ -473,12 +473,12 @@ def fetch_jobs_graphql(
                 try:
                     run_login_subprocess(config)
                 except Exception:
-                    LOGGER.exception("Login lại thất bại")
+                    LOGGER.exception("Re-login failed")
                     return []
                 continue
 
         LOGGER.warning(
-            "GraphQL thất bại (HTTP=%s, challenge=%s, có_payload=%s). %s",
+            "GraphQL failed (HTTP=%s, challenge=%s, has_payload=%s). %s",
             res.http_status,
             res.is_challenge_html,
             res.payload is not None,

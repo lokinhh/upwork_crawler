@@ -1,6 +1,6 @@
 """
 Wire dependencies and run the scanner.
-Có thể gọi: python -m upwork.main (chạy từ thư mục gốc repo).
+Can be run with: python -m upwork.main (from the repo root).
 """
 import logging
 import os
@@ -24,12 +24,12 @@ from .scanner import UpworkScanner
 
 def _load_gemini_keys(config: Config) -> List[str]:
     """
-    Load Gemini API keys, ưu tiên danh sách trong api_key_gemini.txt (mỗi dòng 1 key).
-    Nếu vẫn không có, fallback sang GEMINI_API_KEY đơn lẻ trong config.
+    Load Gemini API keys, prioritizing the list in api_key_gemini.txt (one key per line).
+    If empty, fall back to GEMINI_API_KEY from config.
     """
     keys: List[str] = []
 
-    # File nằm ở thư mục gốc repo (cùng cấp với README.md, .env, api_key_gemini.txt)
+    # File is in repo root (same level as README.md, .env, api_key_gemini.txt).
     project_root = Path(__file__).resolve().parent.parent
     keys_file = project_root / "api_key_gemini.txt"
     if keys_file.exists():
@@ -38,7 +38,7 @@ def _load_gemini_keys(config: Config) -> List[str]:
             if k:
                 keys.append(k)
 
-    # Thêm key đơn lẻ trong config nếu có, ưu tiên đứng đầu
+    # Add single key from config if present, prioritize it first.
     if config.gemini_api_key:
         if config.gemini_api_key not in keys:
             keys.insert(0, config.gemini_api_key)
@@ -48,8 +48,8 @@ def _load_gemini_keys(config: Config) -> List[str]:
 
 def _load_ninerouter_client() -> Optional[NineRouterClient]:
     """
-    Tạo NineRouterClient nếu có NINEROUTER_API_KEY + NINEROUTER_MODEL.
-    Key mặc định local thường là sk_9router (có thể set trong .env).
+    Create NineRouterClient when NINEROUTER_API_KEY + NINEROUTER_MODEL are available.
+    Default local key is usually sk_9router (can be overridden in .env).
     """
     import os
 
@@ -68,8 +68,8 @@ def _load_ninerouter_client() -> Optional[NineRouterClient]:
 
 def _load_openrouter_client() -> Optional[OpenRouterClient]:
     """
-    Tạo OpenRouterClient nếu có cấu hình OPENROUTER_API_KEY + OPENROUTER_MODEL.
-    Nếu thiếu một trong hai thì trả về None (không dùng OpenRouter).
+    Create OpenRouterClient when OPENROUTER_API_KEY + OPENROUTER_MODEL are configured.
+    Return None if either value is missing (OpenRouter disabled).
     """
     import os
 
@@ -88,7 +88,7 @@ def _load_openrouter_client() -> Optional[OpenRouterClient]:
 
 
 def _setup_logging() -> Path:
-    """Log ra console + file (mặc định logs/upwork_scanner.log)."""
+    """Log to console and file (default: logs/upwork_scanner.log)."""
     level_name = (os.getenv("UPWORK_LOG_LEVEL") or os.getenv("LOG_LEVEL") or "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
 

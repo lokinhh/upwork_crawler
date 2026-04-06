@@ -21,21 +21,21 @@ class OpenRouterClient:
 
         self.api_key = api_key
         self.model = model
-        # Cho phép override base URL qua env nếu cần
+        # Allow base URL override via env when needed.
         self.base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
     def summarize(self, job: Dict[str, str]) -> str:
         url = f"{self.base_url.rstrip('/')}/chat/completions"
 
         system_prompt = (
-            "Bạn là trợ lý phân tích job cho freelancer.\n"
-            "Hãy tóm tắt nhanh một job trên Upwork bằng tiếng Việt để giúp quyết định có nên apply hay không.\n"
-            "Trả lời NGẮN GỌN và CHỈ theo đúng định dạng sau:\n\n"
-            "- Tóm tắt: ...\n"
-            "- Yêu cầu chính: ...\n"
-            "- Ngân sách/Rate: ...\n"
-            "- Độ phù hợp (0-10): ...\n"
-            "- Rủi ro cần lưu ý: ...\n\n"
+            "You are a job analysis assistant for freelancers.\n"
+            "Summarize an Upwork job in Vietnamese to help decide whether it is worth applying.\n"
+            "Reply BRIEFLY and ONLY in this exact format:\n\n"
+            "- Summary: ...\n"
+            "- Main requirements: ...\n"
+            "- Budget/Rate: ...\n"
+            "- Fit score (0-10): ...\n"
+            "- Risks to note: ...\n\n"
         )
 
         job_type = job.get("job_type", "")
@@ -44,28 +44,28 @@ class OpenRouterClient:
 
         extra_lines = []
         if job_type:
-            extra_lines.append(f"- Loại job: {job_type}")
+            extra_lines.append(f"- Job type: {job_type}")
         if experience_level:
-            extra_lines.append(f"- Kinh nghiệm mong muốn: {experience_level}")
+            extra_lines.append(f"- Desired experience level: {experience_level}")
         if budget:
-            extra_lines.append(f"- Ngân sách hiển thị: {budget}")
+            extra_lines.append(f"- Displayed budget: {budget}")
 
         extra_text = ""
         if extra_lines:
-            extra_text = "Thông tin thêm về job:\n" + "\n".join(extra_lines) + "\n"
+            extra_text = "Additional job information:\n" + "\n".join(extra_lines) + "\n"
 
         user_content = (
-            f"Tiêu đề: {job.get('title', '')}\n"
-            f"Mô tả: {job.get('description', '')}\n"
+            f"Title: {job.get('title', '')}\n"
+            f"Description: {job.get('description', '')}\n"
             f"Link: {job.get('link', '')}\n"
-            f"Ngày đăng: {job.get('published', '')}\n"
+            f"Posted date: {job.get('published', '')}\n"
             f"{extra_text}"
         )
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            # Khuyen nghi theo docs OpenRouter
+            # Recommended by OpenRouter docs.
             "HTTP-Referer": os.getenv("OPENROUTER_HTTP_REFERER", "https://github.com"),
             "X-Title": os.getenv("OPENROUTER_APP_NAME", "upwork-scanner"),
         }
@@ -84,9 +84,9 @@ class OpenRouterClient:
         response.raise_for_status()
         data = response.json()
         try:
-            # OpenRouter dùng format OpenAI-compatible
+            # OpenRouter uses an OpenAI-compatible response format.
             return data["choices"][0]["message"]["content"].strip()
         except Exception:
             LOGGER.exception("Unexpected OpenRouter response: %s", data)
-            return "Không thể tóm tắt tự động cho job này (OpenRouter trả về định dạng là)."
+            return "Cannot summarize this job automatically (OpenRouter returned an invalid format)."
 

@@ -1,35 +1,35 @@
 #!/usr/bin/env python3
 """
-Debug flow đăng nhập Upwork: mở Brave (cửa sổ thật), đăng nhập tay, bắt toàn bộ
-request/response liên quan auth (login, token, refresh, cookie, OAuth…).
+Debug flow to log in to Upwork: open Brave (real window), log in manually, capture everything
+request/response related to auth (login, token, refresh, cookies, OAuth...).
 
-Tự động:
-  - Lưu storage_state (cookie + localStorage) cho Playwright
-  - Trích xuất tên cookie / gợi ý bearer_cookie (qua auth_loader khi Bearer khớp cookie)
-  - Ghi log chi tiết + snapshot HTML + manifest script (src + inline có giới hạn kích thước)
+Automatic:
+  - Save storage_state (cookie + localStorage) for Playwright
+  - Extract cookie name/bearer_cookie hint (via auth_loader when Bearer matches cookie)
+  - Detailed logging + HTML snapshot + manifest script (src + inline has size limit)
 
-Chạy:
+Run:
   cd debug_upwork_graphql
   source .venv/bin/activate
   python capture_login_flow.py
 
-Biến môi trường:
-  BRAVE_EXECUTABLE          — binary Brave (mặc định tự tìm trên macOS)
-  UPWORK_START_URL          — trang mở đầu (mặc định: trang login)
-  UPWORK_STORAGE_STATE      — file storage_state (mặc định: .auth/storage_state.json)
-  UPWORK_LOGIN_CAPTURE_FRESH — 1 (mặc định): không load storage cũ — đăng nhập từ đầu.
-                              0: load storage_state nếu có (debug refresh / phiên có sẵn)
-  UPWORK_DEBUG_LOG          — file log chính; trống = captures/login_flow_<ts>/session.log
-  UPWORK_LOGIN_OUT_DIR      — thư mục con trong captures/ (trống = login_flow_<UTC_ts>)
-  UPWORK_LOGIN_HTML_DELAY_MS — sau navigate, chờ bao lâu rồi chụp HTML (mặc định 1500)
-  UPWORK_LOGIN_INLINE_MAX_BYTES — mỗi inline script tối đa ghi ra bao nhiêu byte (500000)
-  UPWORK_LOGIN_BODY_MAX_BYTES — response body auth tối đa đọc/ghi (524288)
-  DEBUG_LOG_SENSITIVE       — 1: log đầy đủ cookie/authorization (không commit log)
-  UPWORK_AUTO_AUTH_CONFIG   — giống capture_user_job_search: merge bearer_cookie (mặc định bật)
-  UPWORK_PAGE_CLOSE_TIMEOUT_MS — 0 = chờ đóng tab vô hạn
-  STORAGE_SAVE_INTERVAL     — lưu storage định kỳ (giây), mặc định 60
+Environment variables:
+  BRAVE_EXECUTABLE — Brave binary (default found on macOS)
+  UPWORK_START_URL — opening page (default: login page)
+  UPWORK_STORAGE_STATE — storage_state file (default: .auth/storage_state.json)
+  UPWORK_LOGIN_CAPTURE_FRESH — 1 (default): do not load old storage — log in from scratch.
+                              0: load storage_state if present (debug refresh/session available)
+  UPWORK_DEBUG_LOG — main log file; empty = captures/login_flow_<ts>/session.log
+  UPWORK_LOGIN_OUT_DIR — subfolder in captures/ (empty = login_flow_<UTC_ts>)
+  UPWORK_LOGIN_HTML_DELAY_MS — after navigate, how long to wait before capturing HTML (default 1500)
+  UPWORK_LOGIN_INLINE_MAX_BYTES — Maximum number of bytes each inline script can write (500000)
+  UPWORK_LOGIN_BODY_MAX_BYTES — response body auth maximum read/write (524288)
+  DEBUG_LOG_SENSITIVE — 1: full cookie/authorization log (no commit log)
+  UPWORK_AUTO_AUTH_CONFIG — same as capture_user_job_search: merge bearer_cookie (default on)
+  UPWORK_PAGE_CLOSE_TIMEOUT_MS — 0 = wait for tab close indefinitely
+  STORAGE_SAVE_INTERVAL — save storage periodically (seconds), default 60
 
-Không commit captures/ và .auth/ — chứa session và log.
+Do not commit captures/ and .auth/ — contain sessions and logs.
 """
 from __future__ import annotations
 
@@ -283,7 +283,7 @@ def _host_looks_auth(host: str) -> bool:
 
 
 def is_auth_related_url(url: str) -> bool:
-    """Heuristic: URL có vẻ liên quan auth / SSO / token."""
+    """Heuristic: URL appears to be related to auth/SSO/token."""
     u = (url or "").lower()
     if not u:
         return False
@@ -300,14 +300,14 @@ def is_auth_related_url(url: str) -> bool:
     if "upwork.com" in (p.netloc or "").lower() and any(
         x in path for x in ("/nx/", "/ab/", "/freelancers/", "/signup")
     ):
-        # quá rộng — chỉ khi path có login/account
+        # too broad — only if path includes login/account
         if any(x in path for x in ("login", "account", "security", "oauth")):
             return True
     return False
 
 
 def _set_cookie_auth_related(url: str, header_names: List[str]) -> bool:
-    """Response có Set-Cookie trên domain Upwork → coi là liên quan phiên."""
+    """Response has Set-Cookie on Upwork domain → considered session related."""
     if "set-cookie" not in [x.lower() for x in header_names]:
         return False
     try:
@@ -343,7 +343,7 @@ def _scan_json_for_token_keys(obj: Any, found: Set[str]) -> None:
 
 
 def _summarize_json_body(raw: str) -> Tuple[Optional[Dict[str, Any]], Set[str]]:
-    """Parse JSON nếu được; trả về keys có vẻ token (chỉ tên key)."""
+    """Parse JSON if possible; returns keys with tokens."""
     keys: Set[str] = set()
     try:
         data = json.loads(raw)
@@ -536,7 +536,7 @@ class LoginCaptureState:
         detail(json.dumps(rec, indent=2, ensure_ascii=False), stdout_limit=12_000)
 
     def schedule_page_snapshot(self, page: Page) -> None:
-        """Chụp HTML + script sau delay (SPA)."""
+        """Capture HTML + script after delay (SPA)."""
         if page.is_closed():
             return
         url = page.url or ""
@@ -659,7 +659,7 @@ async def run() -> None:
     brave = _default_brave_executable()
     if not brave:
         print(
-            "Không tìm thấy Brave. Cài Brave hoặc set BRAVE_EXECUTABLE=",
+            "Brave not found. Install Brave or set BRAVE_EXECUTABLE=",
             file=sys.stderr,
         )
         raise SystemExit(1)
@@ -712,7 +712,7 @@ async def run() -> None:
                     log(f"load storage_state from {storage_path} ({_storage_stats(storage_path)})")
                 else:
                     log(
-                        "Chế độ đăng nhập tay: không load storage (UPWORK_LOGIN_CAPTURE_FRESH=0 để load file cũ)."
+                        "Manual login mode: does not load storage (UPWORK_LOGIN_CAPTURE_FRESH=0 to load old files)."
                     )
 
                 context = await browser.new_context(**ctx_opts)
@@ -743,9 +743,9 @@ async def run() -> None:
                     log(f"periodic storage save every {interval}s -> {storage_path}")
 
                 log(f"Brave: {brave}")
-                log(f"Mở: {start_url}")
-                log("Đăng nhập tay trên Upwork (và SSO nếu có). Đóng tab khi xong hoặc Ctrl+C.")
-                log(f"HTML + script manifest sau mỗi navigate (~{_html_delay_ms()}ms delay).")
+                log(f"Open: {start_url}")
+                log("Manually log in to Upwork (and SSO if available). Close tab when done or Ctrl+C.")
+                log(f"HTML + script manifest after each navigate (~{_html_delay_ms()}ms delay).")
                 log("Auth requests/responses -> events/ + events.jsonl\n")
 
                 await page.goto(start_url, wait_until="domcontentloaded")

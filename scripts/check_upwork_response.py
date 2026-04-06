@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Kiểm tra response khi GET Upwork search: status, headers, đoạn body.
-Chạy: python scripts/check_upwork_response.py
-Để xem 403 do Cloudflare hay Upwork/khác.
+Check response from GET Upwork search: status, headers, body snippet.
+Run: python scripts/check_upwork_response.py
+Useful to determine whether 403 comes from Cloudflare or Upwork/other causes.
 """
 import sys
 from pathlib import Path
 
-# Thư mục gốc repo
+# Repo root directory.
 _root = Path(__file__).resolve().parent.parent
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
@@ -52,16 +52,16 @@ def main():
     print("-" * 60)
     print("Body length:", len(body))
 
-    # Gợi ý
+    # Hints
     body_lower = body.lower()
     if "cloudflare" in body_lower or "cf-bypass" in body_lower or "just a moment" in body_lower or "checking your browser" in body_lower:
-        print("\n>>> Co the la CLOUDFLARE (trang challenge / checking browser).")
+        print("\n>>> Likely CLOUDFLARE (challenge/checking browser page).")
     elif "access denied" in body_lower or "blocked" in body_lower or "forbidden" in body_lower:
-        print("\n>>> Co the la Upwork/backend block (403 Forbidden).")
+        print("\n>>> Likely Upwork/backend block (403 Forbidden).")
     if "server" in resp.headers:
         sv = resp.headers["server"]
         if "cloudflare" in sv.lower():
-            print("\n>>> Header Server cho thay CLOUDFLARE.")
+            print("\n>>> Server header indicates CLOUDFLARE.")
 
 
 if __name__ == "__main__":

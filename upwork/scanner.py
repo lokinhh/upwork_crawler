@@ -19,7 +19,7 @@ def build_telegram_message(job: Dict[str, str], summary: str) -> str:
     link = job.get("link", "")
     published = job.get("published", "N/A")
     return (
-        f"[Upwork Job Mới]\n"
+        f"[New Upwork Job]\n"
         f"Title: {title}\n"
         f"Published: {published}\n"
         f"Link: {link}\n\n"
@@ -45,32 +45,32 @@ class UpworkScanner:
         self.telegram = telegram
 
     def _fetch_jobs(self) -> List[Dict[str, str]]:
-        """Fetch jobs qua GraphQL userJobSearch (FlareSolverr + .auth), không fetch HTML.
+        """Fetch jobs via GraphQL userJobSearch (FlareSolverr + .auth), no HTML fetch.
 
-        Hỗ trợ nhiều keyword/URL trong UPWORK_SEARCH_KEYWORD nếu phân tách bằng dấu phẩy.
-        Ví dụ:
+        Supports multiple keywords/URLs in UPWORK_SEARCH_KEYWORD when comma-separated.
+        Example:
         - "spring boot"
         - "spring boot,java backend"
         - "https://www.upwork.com/nx/search/jobs?... , https://www.upwork.com/nx/search/jobs?..."
         """
         if not self.config.upwork_search_keyword:
-            LOGGER.error("UPWORK_SEARCH_KEYWORD chưa được cấu hình; không thể fetch job.")
+            LOGGER.error("UPWORK_SEARCH_KEYWORD is not configured; cannot fetch jobs.")
             return []
 
         if not self.config.flaresolverr_url:
             LOGGER.error(
-                "FLARESOLVERR_URL trống. Bật FlareSolverr (Docker) và đặt FLARESOLVERR_URL "
-                "hoặc sửa cấu hình nếu muốn dùng nguồn khác."
+                "FLARESOLVERR_URL is empty. Start FlareSolverr (Docker) and set FLARESOLVERR_URL "
+                "or update config if you want to use another source."
             )
             return []
 
         try:
             ensure_graphql_session(self.config)
         except (FileNotFoundError, ValueError, RuntimeError) as exc:
-            LOGGER.error("Không thể chuẩn bị phiên GraphQL: %s", exc)
+            LOGGER.error("Cannot prepare GraphQL session: %s", exc)
             return []
         except subprocess.CalledProcessError as exc:
-            LOGGER.error("Đăng nhập tự động thất bại (exit %s).", exc.returncode)
+            LOGGER.error("Automatic login failed (exit %s).", exc.returncode)
             return []
 
         return fetch_jobs_for_keywords(self.config)
@@ -86,7 +86,7 @@ class UpworkScanner:
                 new_jobs = [j for j in jobs if not self.seen_store.has(j["id"])]
 
                 if new_jobs:
-                    # /start gui trong luc fetch job khong duoc lan sync dau vong; sync lai truoc khi gui.
+                    # If /start arrives during fetch, first sync may miss it; sync again before sending.
                     recipients = self.telegram.sync_subscribers(self.subscribers_store)
                     LOGGER.info("Found %s new jobs", len(new_jobs))
                 else:

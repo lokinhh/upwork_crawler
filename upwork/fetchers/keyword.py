@@ -1,4 +1,4 @@
-"""Chuẩn hoá keyword / URL search Upwork → chuỗi `userQuery` cho GraphQL."""
+"""Normalize Upwork search keyword/URL -> GraphQL `userQuery` string."""
 from __future__ import annotations
 
 from urllib.parse import parse_qs, unquote, urlparse
@@ -6,8 +6,8 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 def user_query_from_search_keyword(keyword: str) -> str:
     """
-    - URL đầy đủ hoặc path `/nx/search/jobs?...` → lấy tham số `q` nếu có, không thì rỗng → fallback URL gốc.
-    - Chuỗi thường → strip nguyên văn.
+    - Full URL or `/nx/search/jobs?...` path -> use `q` parameter when present, otherwise fallback to raw URL.
+    - Plain string -> return stripped input.
     """
     kw = (keyword or "").strip()
     if not kw:

@@ -1,4 +1,4 @@
-"""Gom keyword → GraphQL userJobSearch (FlareSolverr + .auth). Không còn fetch HTML."""
+"""Collect keywords -> GraphQL userJobSearch (FlareSolverr + .auth). HTML fetch removed."""
 from __future__ import annotations
 
 import logging
@@ -13,16 +13,16 @@ LOGGER = logging.getLogger("upwork.fetchers.jobs")
 
 def fetch_jobs_for_keywords(config: Config) -> List[Dict[str, str]]:
     """
-    Đọc `UPWORK_SEARCH_KEYWORD` (phân tách bằng dấu phẩy), gọi GraphQL,
-    gộp kết quả và loại trùng `id`.
+    Read `UPWORK_SEARCH_KEYWORD` (comma-separated), call GraphQL,
+    merge results, and deduplicate by `id`.
     """
     raw = (config.upwork_search_keyword or "").strip()
     if not raw:
-        LOGGER.error("UPWORK_SEARCH_KEYWORD trống.")
+        LOGGER.error("UPWORK_SEARCH_KEYWORD is empty.")
         return []
 
     if not config.flaresolverr_url:
-        LOGGER.error("FLARESOLVERR_URL trống — bắt buộc cho GraphQL + Cloudflare.")
+        LOGGER.error("FLARESOLVERR_URL is empty - required for GraphQL + Cloudflare.")
         return []
 
     parts = [p.strip() for p in raw.split(",") if p.strip()]
@@ -39,7 +39,7 @@ def fetch_jobs_for_keywords(config: Config) -> List[Dict[str, str]]:
 
         uq = user_query_from_search_keyword(kw)
         if not uq:
-            LOGGER.warning("Bỏ qua keyword rỗng sau chuẩn hoá: %r", kw)
+            LOGGER.warning("Skip empty keyword after normalization: %r", kw)
             continue
         jobs = fetch_jobs_graphql(
             uq,

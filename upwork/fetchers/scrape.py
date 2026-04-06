@@ -66,8 +66,8 @@ def _parse_jobs_from_html(html: str) -> List[Dict[str, str]]:
 
     Strategy:
     1) Try to find <script type="application/json"> blocks with job data (older layout).
-    2) Nếu không có, parse trực tiếp DOM JobTile (UI hiện tại).
-    3) Cuối cùng, fallback regex scan trên raw HTML để bắt "ciphertext".
+    2) If not found, parse JobTile directly from DOM (current UI).
+    3) Finally, regex-scan raw HTML to capture "ciphertext".
     """
     save_html_to_file(html)
 
@@ -105,7 +105,7 @@ def _parse_jobs_from_html(html: str) -> List[Dict[str, str]]:
         href = link_el.get("href") or ""
         title = link_el.get_text(strip=True) or "N/A"
 
-        # ID: ưu tiên ciphertext trong URL (~...), fallback sang data-ev-job-uid
+        # ID: prefer ciphertext in URL (~...), fallback to data-ev-job-uid.
         cid = None
         m = re.search(r"~([^/?]+)", href)
         if m:
@@ -198,7 +198,7 @@ def _parse_jobs_from_html(html: str) -> List[Dict[str, str]]:
     return jobs
 
 
-# Thứ tự thử impersonate khi bị 403 (curl_cffi)
+# Impersonation fallback order when receiving 403 (curl_cffi).
 IMPERSONATE_FALLBACKS = ("chrome120", "safari17_0", "chrome119", "safari15_5", "edge101")
 
 
@@ -241,5 +241,5 @@ def fetch_jobs_from_scrape(
 
     jobs = _parse_jobs_from_html(resp.text)
     if not jobs:
-        LOGGER.debug("Scrape 200 but 0 jobs (HTML/JSON co the doi)")
+        LOGGER.debug("Scrape returned 200 but 0 jobs (HTML/JSON may have changed)")
     return jobs

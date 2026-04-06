@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-In ra các dòng `export VAR=...` (shell) từ .auth/storage_state.json (+ auth_config.json).
-Dùng:  eval "$(python3 export_auth_env.py)"
+Print out `export VAR=...` (shell) lines from .auth/storage_state.json (+ auth_config.json).
+Use: eval "$(python3 export_auth_env.py)"
 
-Biến môi trường đã set trước khi chạy vẫn được giữ; script chỉ in giá trị đã merge
-(auth_loader ưu tiên env ghi đè file — nên chạy khi chưa export).
+Environment variables set before running are still kept; The script only prints the merged value
+(auth_loader prioritizes env file overwriting — should run without export).
 """
 from __future__ import annotations
 

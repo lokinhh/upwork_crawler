@@ -8,7 +8,7 @@ from .openrouter import OpenRouterClient
 
 LOGGER = logging.getLogger("upwork.clients.summarizer")
 
-_FAILURE_PREFIX = "Khong the tom tat tu dong cho job nay"
+_FAILURE_PREFIX = "Cannot summarize this job automatically"
 
 
 def _looks_like_failure(text: str) -> bool:
@@ -16,7 +16,7 @@ def _looks_like_failure(text: str) -> bool:
     t = (text or "").strip().lower()
     if t.startswith(_FAILURE_PREFIX.lower()):
         return True
-    if "không thể tóm tắt" in t or "khong the tom tat" in t:
+    if "cannot summarize" in t:
         return True
     return False
 
@@ -25,8 +25,8 @@ class SummarizerClient:
     """
     High-level summarizer used by the scanner.
 
-    - Ưu tiên 9Router (OpenAI-compatible, thường chạy local).
-    - Fallback OpenRouter, rồi Gemini (nếu được cấu hình).
+    - Prefer 9Router first (OpenAI-compatible, usually local).
+    - Fallback to OpenRouter, then Gemini (if configured).
     """
 
     def __init__(
@@ -73,5 +73,5 @@ class SummarizerClient:
             except Exception as exc:
                 LOGGER.exception("Gemini summarize failed: %s", exc)
 
-        return f"{_FAILURE_PREFIX} (tat ca backend deu that bai)."
+        return f"{_FAILURE_PREFIX} (all backends failed)."
 

@@ -1,89 +1,89 @@
 # Debug Upwork GraphQL (`userJobSearch`)
 
-Công cụ chạy **Brave** có giao diện, đăng nhập tay, rồi **bắt request/response** POST tới:
+The **Brave** running tool has an interface, manually log in, then **capture request/response** POST to:
 
 `https://www.upwork.com/api/graphql/v1?alias=userJobSearch`
 
-Dùng để điều tra payload GraphQL (query/variables) và JSON trả về — không thay thế API chính thức của Upwork.
+Used to investigate GraphQL payload (query/variables) and returned JSON — does not replace Upwork's official API.
 
-## Thư mục `.auth/` (Playwright)
+## `.auth/` directory (Playwright)
 
-Sau khi chạy `capture_user_job_search.py`, file **`.auth/storage_state.json`** chứa cookie + `localStorage`. Các script sau **đọc tự động** từ đó (không cần `export` tay), trừ khi bạn đã set biến môi trường — **env luôn ghi đè file**:
+After running `capture_user_job_search.py`, the file **`.auth/storage_state.json`** contains cookies + `localStorage`. The following scripts **read automatically** from there (no manual `export` required), unless you have set an environment variable — **env always overwrites file**:
 
-| Nguồn | Ý nghĩa |
+| Source | Meaning |
 |--------|--------|
-| Cookie header | Ghép từ mảng `cookies` trong `storage_state.json` |
-| `Authorization: Bearer …` | Suy ra từ cookie: **ưu tiên cookie tên `*sb`** (client GraphQL/search), trước `oauth2_global_js_token` (scope khác, dễ lỗi quyền field) |
+| Cookie header | Concatenate from `cookies` array in `storage_state.json` |
+| `Authorization: Bearer …` | Inferred from cookies: **prefer cookie named `*sb`** (GraphQL/search client), before `oauth2_global_js_token` (different scope, prone to field permission errors) |
 | `x-upwork-api-tenantid` | Cookie `current_organization_uid` |
-| `FLARESOLVERR_URL` / warm URL | Mặc định `http://localhost:8191` và URL job search; có thể sửa trong **`.auth/auth_config.json`** (xem `auth_config.json.example`) |
+| `FLARESOLVERR_URL` /warm URL | Default `http://localhost:8191` and URL job search; editable in **`.auth/auth_config.json`** (see `auth_config.json.example`) |
 
-Tùy chọn copy `auth_config.json.example` → `.auth/auth_config.json` và chỉnh `bearer_cookie`, `tenant_id`, `flaresolverr_url`, …
+Optionally copy `auth_config.json.example` → `.auth/auth_config.json` and adjust `bearer_cookie`, `tenant_id`, `flaresolverr_url`, …
 
-**Bearer khớp DevTools (khi log đã redact token):** tạo file **`.auth/bearer.txt`** — một dòng, nội dung copy từ Network → request `userJobSearch` → header **Authorization** (hoặc chỉ phần `oauth2v2_int_…`). File này ghi đè token suy ra từ cookie (trừ khi đã `export UPWORK_AUTHORIZATION=...`).
+**Bearer matches DevTools (when log has redacted token):** creates file **`.auth/bearer.txt`** — one line, content copied from Network → request `userJobSearch` → **Authorization** header (or just the `oauth2v2_int_…` part). This file overrides the token derived from the cookie (unless `export UPWORK_AUTHORIZATION=...` has been given).
 
-**Phân tích log cũ:** `python analyze_capture_log.py captures/debug_session_*.log` — báo rõ nếu `authorization` là `<redacted>` (không thể “đọc” token từ log).
+**Analyze old log:** `python analyze_capture_log.py captures/debug_session_*.log` — specify if `authorization` is `<redacted>` (cannot “read” tokens from log).
 
-**In shell để debug:** `eval "$(python3 export_auth_env.py)"`
+**Print shell for debugging:** `eval "$(python3 export_auth_env.py)"`
 
 ## Postman
 
-1. **Import** file `Upwork_userJobSearch.postman_collection.json` (Postman → Import → chọn file).
-2. Mở collection → tab **Variables** (hoặc tạo Environment từ `postman_environment.example.json`) và điền:
-   - **`authorization`**: nguyên giá trị header `Authorization` từ DevTools (vd. `Bearer oauth2v2_int_...`).
-   - **`cookie`**: nguyên chuỗi header `Cookie` từ cùng request `userJobSearch`.
-   - **`tenant_id`**: giá trị `x-upwork-api-tenantid`.
-   - **`referer`**: nên trùng URL search bạn đang dùng (ảnh hưởng một số kiểm tra phía server).
-3. Trong request **Body** (raw JSON) sửa `variables.requestVariables` (`userQuery`, `sort`, `paging.offset` / `count`) nếu cần.
-4. **Send**. Nếu `401` / `403` / challenge: token hoặc cookie hết hạn — copy lại từ trình duyệt sau khi đăng nhập; đôi khi cần thêm header trace (`vnd-eo-*`) giống hệt bản copy từ Network.
+1. **Import** file `Upwork_userJobSearch.postman_collection.json` (Postman → Import → select file).
+2. Open collection → **Variables** tab (or create Environment from `postman_environment.example.json`) and fill in:
+   - **`authorization`**: original `Authorization` header value from DevTools (e.g. `Bearer oauth2v2_int_...`).
+   - **`cookie`**: original `Cookie` header string from the same `userJobSearch` request.
+   - **`tenant_id`**: value `x-upwork-api-tenant`.
+   - **`referer`**: should match the search URL you are using (affects some server-side checks).
+3. In the request **Body** (raw JSON) edit `variables.requestVariables` (`userQuery`, `sort`, `paging.offset` / `count`) if necessary.
+4. **Send**. If `401` / `403` / challenge: token or cookie expired — copy from browser after login; Sometimes it is necessary to add a header trace (`vnd-eo-*`) exactly like the copy from Network.
 
-File `postman_userJobSearch_body.json` là bản tách của body (cùng nội dung với collection) để chỉnh ngoài Postman rồi dán lại nếu muốn.
+The file `postman_userJobSearch_body.json` is a split copy of the body (same content as the collection) that can be edited outside of Postman and then pasted if desired.
 
 ### curl
 
-Nếu đã có **`.auth/storage_state.json`**, chỉ cần:
+If **`.auth/storage_state.json`** already exists, just:
 
 ```bash
 chmod +x curl_userJobSearch.sh
 ./curl_userJobSearch.sh
 ```
 
-Hoặc dùng `curl.env` / export tay — **env ghi đè** giá trị suy ra từ `.auth`. Body: `postman_userJobSearch_body.json`.
+Or use `curl.env` / export manually — **env overrides** the value derived from `.auth`. Body: `postman_userJobSearch_body.json`.
 
 - `UPWORK_OUT=./resp.json` — ghi body ra file, headers response in ra stderr.
-- `UPWORK_VERBOSE=1` — bật `curl -v`.
+- `UPWORK_VERBOSE=1` — enable `curl -v`.
 
-### 403 dù đã có Authorization / Cookie — và FlareSolverr
+### 403 despite Authorization / Cookies — and FlareSolverr
 
-**Có auth vẫn có thể 403** vì:
+**With auth it can still 403** because:
 
-- Cloudflare lọc theo **TLS / fingerprint**; `curl` không giống Chrome.
-- Thiếu hoặc hết hạn **`cf_clearance`**, **`__cf_bm`** (cookie CF), hoặc không khớp **User-Agent** với phiên đã qua challenge.
+- Cloudflare filters by **TLS / fingerprint**; `curl` is not like Chrome.
+- Missing or expired **`cf_clearance`**, **`__cf_bm`** (CF cookie), or mismatched **User-Agent** with the challenged session.
 
-**FlareSolverr** (`http://localhost:8191`) mở trang bằng trình duyệt headless → lấy cookie CF mới. Nó **không** thay thế cookie đăng nhập Upwork; cần **gộp** cookie từ FlareSolverr với cookie bạn copy từ DevTools (session).
+**FlareSolverr** (`http://localhost:8191`) opens the page in a headless browser → gets the new CF cookie. It **doesn't** replace the Upwork login cookie; need to **merge** the cookie from FlareSolverr with the cookie you copied from DevTools (session).
 
-Chạy (Docker compose đã có FlareSolverr → port **8191**):
+Run (Docker compose already has FlareSolverr → port **8191**):
 
 ```bash
-docker compose up -d flaresolverr   # nếu chưa chạy
+docker compose up -d flaresolverr # if not already running
 cd debug_upwork_graphql
 pip install -r requirements.txt
 python graphql_via_flaresolverr.py
 ```
 
-Đủ **`.auth/storage_state.json`** là đủ; chỉ cần `export …` nếu muốn ghi đè (hoặc thêm `.auth/auth_config.json` cho URL FlareSolverr / warm URL).
+**`.auth/storage_state.json`** is enough; just `export …` if you want to override (or add `.auth/auth_config.json` for FlareSolverr / warm URL).
 
-Script: GET qua FlareSolverr tới `UPWORK_WARM_URL` (mặc định trang job search) → merge cookies → POST GraphQL. Nếu vẫn 403, thử copy lại token/cookie từ trình duyệt vừa mở hoặc tăng `FLARESOLVERR_TIMEOUT_MS`.
+Script: GET via FlareSolverr to `UPWORK_WARM_URL` (default job search page) → merge cookies → POST GraphQL. If still 403, try copying the token/cookie from the browser you just opened or increasing `FLARESOLVERR_TIMEOUT_MS`.
 
-**Lưu ý:** Gọi GraphQL “như API” có thể trái ToS; chỉ dùng để debug cá nhân.
+**Note:** Calling GraphQL “as an API” may violate the ToS; For personal debugging purposes only.
 
-## Yêu cầu
+## Request
 
-- **Python** 3.9+ (khuyên 3.11)
-- **Trình duyệt Brave** đã cài (macOS: thường ở `/Applications/Brave Browser.app/...`)
+- **Python** 3.9+ (3.11 recommended)
+- **Brave browser** installed (macOS: usually located at `/Applications/Brave Browser.app/...`)
 
-## Cài đặt và chạy
+## Install and run
 
-Từ thư mục gốc repo:
+From the root repo directory:
 
 ```bash
 cd debug_upwork_graphql
@@ -93,69 +93,69 @@ pip install -r requirements.txt
 python capture_user_job_search.py
 ```
 
-1. Mở cửa sổ Brave → đăng nhập Upwork (lần đầu).
-2. Vào **Job search**, chỉnh filter / lật trang để site gọi lại `userJobSearch`.
-3. Trong terminal xem tóm tắt; **chi tiết đầy đủ** nằm trong file log và thư mục `captures/`.
-4. Thoát: đóng tab/cửa sổ hoặc **Ctrl+C**. Phiên đăng nhập được lưu để lần sau bớt nhập lại.
+1. Open the Brave window → log in to Upwork (first time).
+2. Go to **Job search**, adjust the filter / turn the page so that the site calls back `userJobSearch`.
+3. In terminal view summary; **full details** are in the log file and `captures/` directory.
+4. Exit: close tab/window or **Ctrl+C**. The login session is saved to reduce re-entry next time.
 
-Script **chờ đóng tab không giới hạn thời gian** (mặc định). Trước đây Playwright chờ `close` với timeout 30s nên dễ lỗi nếu bạn vẫn đang lướt. Muốn giới hạn (vd. test tự động): `UPWORK_PAGE_CLOSE_TIMEOUT_MS=120000`.
+Script **wait for tab close indefinitely** (default). Previously, Playwright waited for `close` with a timeout of 30 seconds, so it was easy to fail if you were still surfing. Want to limit (eg. automated testing): `UPWORK_PAGE_CLOSE_TIMEOUT_MS=120000`.
 
-## File Postman / body (commit được, không chứa secret)
+## File Postman / body (can be committed, does not contain secrets)
 
-| File | Mô tả |
+| File | Description |
 |------|--------|
-| `Upwork_userJobSearch.postman_collection.json` | Collection v2.1 — request `userJobSearch` + biến `authorization` / `cookie` / … |
-| `postman_userJobSearch_body.json` | Body GraphQL (`query` + `variables`) trích từ capture |
-| `postman_environment.example.json` | Mẫu environment — **copy ra file riêng**, điền secret local, không commit |
-| `curl_userJobSearch.sh` | Script `curl` — đọc `postman_userJobSearch_body.json` + biến `UPWORK_*` |
-| `curl.env.example` | Mẫu cho `curl.env` (copy → điền; `curl.env` đã gitignore) |
-| `graphql_via_flaresolverr.py` | Đọc `.auth/storage_state.json`, merge CF (FlareSolverr), **tính lại Bearer từ cookie đã merge**, POST GraphQL |
-| `auth_loader.py` | Đọc `.auth/storage_state.json` (+ `auth_config.json`) → Bearer, Cookie, tenant, URL |
+| `Upwork_userJobSearch.postman_collection.json` | Collection v2.1 — request `userJobSearch` + variable `authorization` / `cookie` / … |
+| `postman_userJobSearch_body.json` | Body GraphQL (`query` + `variables`) extracted from capture |
+| `postman_environment.example.json` | Environment template — **copy to separate file**, fill in local secret, do not commit |
+| `curl_userJobSearch.sh` | Script `curl` — read `postman_userJobSearch_body.json` + variable `UPWORK_*` |
+| `curl.env.example` | Template for `curl.env` (copy → fill; `curl.env` gitignore) |
+| `graphql_via_flaresolverr.py` | Read `.auth/storage_state.json`, merge CF (FlareSolverr), **recalculate Bearer from merged cookie**, POST GraphQL |
+| `auth_loader.py` | Read `.auth/storage_state.json` (+ `auth_config.json`) → Bearer, Cookie, tenant, URL |
 | `export_auth_env.py` | In `export VAR=...` cho shell (`eval "$(python3 export_auth_env.py)"`) |
-| `auth_config.json.example` | Mẫu copy → `.auth/auth_config.json` |
-| `analyze_capture_log.py` | Kiểm tra log capture có redact Authorization hay không |
-| `.auth/bearer.txt` | (tuỳ chọn) một dòng Bearer copy từ DevTools — ưu tiên hơn suy từ cookie |
+| `auth_config.json.example` | Sample copy → `.auth/auth_config.json` |
+| `analyze_capture_log.py` | Check whether log capture has redact Authorization |
+| `.auth/bearer.txt` | (optional) a Bearer line copied from DevTools — preferred over cookie inference |
 
-## File sinh ra (đã `.gitignore`)
+## Generated file (with `.gitignore`)
 
-| Đường dẫn | Mô tả |
+| Path | Description |
 |-----------|--------|
 | `.auth/storage_state.json` | Cookie + `localStorage` (Playwright `storage_state`) |
-| `captures/debug_session_*.log` | Log chi tiết phiên (mặc định mỗi lần chạy một file) |
-| `captures/userJobSearch_response_*.json` | Body response GraphQL đầy đủ |
-| `captures/userJobSearch_request_*.json` | Chỉ khi bật `SAVE_REQUEST_JSON=1` |
+| `captures/debug_session_*.log` | Log session details (default one file per run) |
+| `captures/userJobSearch_response_*.json` | Body response full GraphQL |
+| `captures/userJobSearch_request_*.json` | Only when `SAVE_REQUEST_JSON=1` | is enabled
 
-**Không commit** `.auth/`, `captures/`, và không đẩy log chứa cookie/token lên git/public.
+**Do not commit** `.auth/`, `captures/`, and do not push logs containing cookies/tokens to git/public.
 
-## Biến môi trường
+## Environment variables
 
-| Biến | Ý nghĩa |
+| Variable | Meaning |
 |------|--------|
-| `BRAVE_EXECUTABLE` | Đường dẫn binary Brave nếu không tự tìm thấy |
-| `UPWORK_START_URL` | URL mở khi start (mặc định trang login Upwork) |
-| `UPWORK_STORAGE_STATE` | File lưu phiên (mặc định `.auth/storage_state.json`) |
-| `UPWORK_DEBUG_LOG` | File log: đường dẫn tùy chỉnh; để trống = tự tạo trong `captures/`; `0` / `off` = không ghi file |
-| `SAVE_REQUEST_JSON` | `1` = ghi thêm file JSON request vào `captures/` |
-| `STORAGE_SAVE_INTERVAL` | Giây — lưu phiên định kỳ (mặc định `120`, `0` = tắt) |
-| `DEBUG_UPWORK_CONSOLE` | `1` = in `console.log` từ trang lên terminal/log |
-| `DEBUG_LOG_SENSITIVE` | `1` = log nguyên header `cookie` / `authorization` (**rất rủi ro**, chỉ local) |
-| `DEBUG_TOKEN_MAP` | `1` = khi có `userJobSearch`, log **tên cookie** nào trùng giá trị Bearer (không in token) + key `localStorage` gợi ý — để hiểu token đến từ đâu |
-| `UPWORK_PAGE_CLOSE_TIMEOUT_MS` | Thời gian chờ đóng tab (ms). `0` (mặc định) = chờ vô hạn; tránh timeout 30s mặc định của Playwright |
+| `BRAVE_EXECUTABLE` | Brave binary path if not found |
+| `UPWORK_START_URL` | URL to open on start (default Upwork login page) |
+| `UPWORK_STORAGE_STATE` | Session storage file (default `.auth/storage_state.json`) |
+| `UPWORK_DEBUG_LOG` | Log file: custom path; blank = self-generated in `captures/`; `0` / `off` = do not write file |
+| `SAVE_REQUEST_JSON` | `1` = add JSON request file to `captures/` |
+| `STORAGE_SAVE_INTERVAL` | Seconds — save sessions periodically (default `120`, `0` = off) |
+| `DEBUG_UPWORK_CONSOLE` | `1` = print `console.log` from the page to terminal/log |
+| `DEBUG_LOG_SENSITIVE` | `1` = log raw header `cookie` / `authorization` (**very risky**, local only) |
+| `DEBUG_TOKEN_MAP` | `1` = when there is `userJobSearch`, log which **cookie name** matches the Bearer value (don't print the token) + key `localStorage` hint — to understand where the token came from |
+| `UPWORK_PAGE_CLOSE_TIMEOUT_MS` | Tab closing timeout (ms). `0` (default) = wait indefinitely; avoid Playwright's default 30s timeout |
 
-Ví dụ một lần chạy với log cố định:
+Example run with fixed log:
 
 ```bash
 export UPWORK_DEBUG_LOG="$PWD/captures/my_run.log"
 python capture_user_job_search.py
 ```
 
-## Gợi ý xử lý sự cố
+## Troubleshooting suggestions
 
-- **Không thấy Brave**: cài Brave hoặc set `BRAVE_EXECUTABLE`.
-- **Vẫn bắt buộc đăng nhập mỗi lần**: xóa `.auth/storage_state.json` thử lại từ đầu; kiểm tra Upwork có hết hạn phiên không.
-- **Không có request `userJobSearch`**: mở đúng trang search job và đợi/đổi filter để danh sách job load lại.
-- **HTTP 200 nhưng GraphQL**: `Requested oAuth2 client does not have permission to see some of the requested fields` — **không phải** “sai mật khẩu”: token đã được chấp nhận nhưng **một số field trong câu query** (vd. `upworkHistoryData`, `totalSpent`, facets…) **không thuộc scope** OAuth client gắn với token khi gọi kiểu này. **Cách xử lý:** chạy `UPWORK_GRAPHQL_MINIMAL=1 python graphql_via_flaresolverr.py` (body tối giản trong `postman_userJobSearch_body.minimal.json`); hoặc copy **nguyên** `query` + `variables` từ request `userJobSearch` **200** trong DevTools vào file body tùy chỉnh rồi `UPWORK_GRAPHQL_BODY=.../my.json`. Có thể kèm **`.auth/bearer.txt`** nếu token suy từ cookie vẫn lệch.
+- **Not seeing Brave**: install Brave or set `BRAVE_EXECUTABLE`.
+- **Still required to log in every time**: delete `.auth/storage_state.json` try again from scratch; check if Upwork session expires.
+- **No `userJobSearch` request**: open the correct job search page and wait/change the filter for the job list to reload.
+- **HTTP 200 but GraphQL**: `Requested oAuth2 client does not have permission to see some of the requested fields` — **not** “wrong password”: token was accepted but **some fields in the query** (eg `upworkHistoryData`, `totalSpent`, facets…) **are not in scope** The OAuth client binds the token when calling this type. **Workaround:** run `UPWORK_GRAPHQL_MINIMAL=1 python graphql_via_flaresolverr.py` (minimal body in `postman_userJobSearch_body.minimal.json`); or copy **raw** `query` + `variables` from request `userJobSearch` **200** in DevTools into the custom body file and then `UPWORK_GRAPHQL_BODY=.../my.json`. **`.auth/bearer.txt`** can be included if the token derived from the cookie is still incorrect.
 
-## Lưu ý
+## Note
 
-Tự động hóa / thu thập dữ liệu có thể **không phù hợp Điều khoản** của Upwork. Chỉ dùng công cụ này cho mục đích cá nhân, hiểu rủi ro với tài khoản.
+Automation/data collection may be **incompatible with Upwork's Terms**. Use this tool for personal use only, understanding the risks to your account.

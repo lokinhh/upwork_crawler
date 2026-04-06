@@ -1,33 +1,33 @@
 #!/usr/bin/env python3
 """
-Gọi GraphQL userJobSearch sau khi làm mới cookie Cloudflare qua FlareSolverr.
+Call GraphQL userJobSearch after refreshing the Cloudflare cookie via FlareSolverr.
 
-Body mặc định — postman_userJobSearch_body.json — đồng bộ query + variables với request thành công trong
-captures/debug_session_20260326_071440.log (userJobSearch REQUEST, dòng request body). Không dùng bản «minimal»
-trừ khi bạn chủ động bật UPWORK_GRAPHQL_MINIMAL=1.
+Default body — postman_userJobSearch_body.json — synchronizes query + variables with successful request in
+captures/debug_session_20260326_071440.log (userJobSearch REQUEST, request body line). Do not use the «minimal» version
+unless you actively enable UPWORK_GRAPHQL_MINIMAL=1.
 
-Tại sao cùng query mà web (Playwright/DevTools) chạy được, script gọi API lại hay lỗi OAuth / 403?
+Why does the same query that the web (Playwright/DevTools) runs, does the script call the API or get an OAuth / 403 error?
 
-  1) Bearer phải là đúng OAuth client cho universal search. Trong log, DEBUG_TOKEN_MAP ghi Bearer khớp cookie
-     «25897f9esb» — không phải lúc nào cũng cookie *fsb. Nếu script chọn nhầm cookie *fsb khác trong storage,
-     Upwork trả «Requested oAuth2 client does not have permission…» dù query giống hệt. Cách chắc chắn: copy
-     tên cookie từ dòng DEBUG_TOKEN_MAP (hoặc Authorization) vào .auth/auth_config.json → bearer_cookie,
-     hoặc copy token vào .auth/bearer.txt.
+  1) Bearer must be the correct OAuth client for universal search. In the log, DEBUG_TOKEN_MAP records Bearer matching cookies
+     «25897f9esb» — not always *fsb cookie. If the script mistakenly selects another *fsb cookie in storage,
+     Upwork returns «Requested oAuth2 client does not have permission…» even though the query is identical. Sure way: copy
+     cookie name from DEBUG_TOKEN_MAP (or Authorization) line into .auth/auth_config.json → bearer_cookie,
+     or copy the token to .auth/bearer.txt.
 
-  2) Cloudflare: cookie cf_clearance gắn với User-Agent của FlareSolverr — POST GraphQL mặc định dùng UA đó.
-     Đặt UPWORK_UA khác sẽ dễ bị HTML «Challenge» (403).
+  2) Cloudflare: cf_clearance cookie tied to FlareSolverr's User-Agent — POST GraphQL uses that UA by default.
+     Setting UPWORK_UA otherwise will be susceptible to HTML «Challenge» (403).
 
-  3) Trình duyệt thật: TLS / ngữ cảnh same-origin khác requests thuần; phần còn lại giải quyết bằng (1)+(2).
+  3) Real browser: TLS/same-origin context is different from plain requests; The remaining part is solved by (1)+(2).
 
-Cấu hình .auth/: storage_state.json, auth_config.json (flaresolverr_url, warm_url, bearer_cookie, …).
-Biến môi trường UPWORK_*, FLARESOLVERR_* ghi đè file.
+.auth/ configuration: storage_state.json, auth_config.json (flaresolverr_url, warm_url, bearer_cookie, …).
+Environment variables UPWORK_*, FLARESOLVERR_* override the file.
 
-Luồng: đọc .auth → FlareSolverr GET warm_url → merge cookie → resolve Authorization → POST GraphQL.
+Flow: read .auth → FlareSolverr GET warm_url → merge cookies → resolve Authorization → POST GraphQL.
 
-  UPWORK_GRAPHQL_BODY=/path/to/body.json — ghi đè file body.
-  UPWORK_GRAPHQL_REFERER — mặc định Referer giống log capture (khác warm_url nếu cần).
+  UPWORK_GRAPHQL_BODY=/path/to/body.json — overrides the body file.
+  UPWORK_GRAPHQL_REFERER — default Referer same as log capture (different from warm_url if needed).
 
-Exit: 3 = HTTP >=400 ; 4 = HTTP 200 nhưng body có GraphQL errors.
+Exit: 3 = HTTP >=400 ; 4 = HTTP 200 but body has GraphQL errors.
 """
 from __future__ import annotations
 
@@ -63,14 +63,14 @@ BODY_PATH = ROOT / "postman_userJobSearch_body.json"
 BODY_MINIMAL_PATH = ROOT / "postman_userJobSearch_body.minimal.json"
 GRAPHQL = "https://www.upwork.com/api/graphql/v1?alias=userJobSearch"
 
-# Referer trùng captures/debug_session_20260326_071440.log (request userJobSearch). UPWORK_GRAPHQL_REFERER ghi đè.
+# Duplicate referer captures/debug_session_20260326_071440.log (request userJobSearch). UPWORK_GRAPHQL_REFERER override.
 _GRAPHQL_REFERER_FROM_CAPTURE = (
     "https://www.upwork.com/nx/search/jobs/"
     "?from_recent_search=true&q=spring%20boot&page=2"
 )
 
-# Khi POST bằng requests + cookie CF từ FlareSolverr: User-Agent phải trùng UA mà FlareSolverr dùng khi giải
-# challenge — nếu không Cloudflare trả HTML «Challenge - Upwork» (403). Xem README FlareSolverr.
+# When POSTing with requests + CF cookies from FlareSolverr: User-Agent must match the UA that FlareSolverr uses when resolving
+# challenge — otherwise Cloudflare returns HTML «Challenge - Upwork» (403). See README FlareSolverr.
 _DEFAULT_FALLBACK_UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
@@ -104,7 +104,7 @@ def _merge_cookies(existing_header: str, flaresolver_list: List[Dict[str, Any]])
 
 
 def _browser_client_hints_headers() -> Dict[str, str]:
-    """Gần request userJobSearch thành công từ Brave/Chromium (DevTools)."""
+    """Nearly successful userJobSearch request from Brave/Chromium (DevTools)."""
     return {
         "sec-ch-ua": '"Chromium";v="146", "Not-A.Brand";v="24", "Brave";v="146"',
         "sec-ch-ua-mobile": "?0",
@@ -125,12 +125,12 @@ def _browser_client_hints_headers() -> Dict[str, str]:
 
 
 def _upwork_edge_headers(cookie_header: str) -> Dict[str, str]:
-    """Giống log capture (063705): vnd-eo-* — một số route GraphQL kỳ vọng có trace/visitor."""
+    """Same as log capture (063705): vnd-eo-* — some GraphQL routes expect trace/visitor."""
     ck = parse_cookie_header(cookie_header)
     visitor = ck.get("visitor_id", "").strip()
     span = str(uuid.uuid4())
     parent = str(uuid.uuid4())
-    # Mẫu trace trong log: 9e242565f33b861d-PDX
+    # Sample trace in log: 9e242565f33b861d-PDX
     trace = f"{secrets.token_hex(8)}-PDX"
     h: Dict[str, str] = {
         "vnd-eo-span-id": span,
@@ -147,8 +147,8 @@ def main() -> None:
     try:
         auth = load_merged_auth(auth_dir)
     except Exception as exc:
-        print(f"Lỗi đọc .auth: {exc}", file=sys.stderr)
-        print(f"  Cần: {auth_dir / 'storage_state.json'} (chạy capture_user_job_search.py)", file=sys.stderr)
+        print(f"Error reading .auth: {exc}", file=sys.stderr)
+        print(f" Needed: {auth_dir / 'storage_state.json'} (run capture_user_job_search.py)", file=sys.stderr)
         raise SystemExit(1)
 
     fs = auth["flaresolverr_url"]
@@ -158,12 +158,12 @@ def main() -> None:
 
     body_file = _resolve_body_path()
     if not body_file.is_file():
-        print(f"Thiếu file body GraphQL: {body_file}", file=sys.stderr)
+        print(f"Missing GraphQL body file: {body_file}", file=sys.stderr)
         raise SystemExit(1)
     if body_file == BODY_PATH:
         print(
             "[0] Body: postman_userJobSearch_body.json "
-            "(query + variables như captures/debug_session_20260326_071440.log)",
+            "(query + variables as captures/debug_session_20260326_071440.log)",
             flush=True,
         )
     else:
@@ -192,7 +192,7 @@ def main() -> None:
     sol = data.get("solution") or {}
     fs_cookies = sol.get("cookies") or []
     fs_ua = (sol.get("userAgent") or "").strip()
-    # Mặc định: UA từ FlareSolverr (khớp cf_clearance). UPWORK_UA= ghi đè; UPWORK_USE_FLARE_UA=0 dùng UA cố định.
+    # Default: UA from FlareSolverr (matches cf_clearance). UPWORK_UA= override; UPWORK_USE_FLARE_UA=0 uses fixed UA.
     if os.environ.get("UPWORK_UA", "").strip():
         ua = os.environ["UPWORK_UA"].strip()
     elif os.environ.get("UPWORK_USE_FLARE_UA", "1").strip().lower() in ("0", "false", "no", "off"):
@@ -201,13 +201,13 @@ def main() -> None:
         ua = fs_ua or _DEFAULT_FALLBACK_UA
 
     merged = _merge_cookies(cookie_user, fs_cookies)
-    print(f"[2] Đã merge {len(fs_cookies)} cookie từ FlareSolverr vào phiên của bạn.", flush=True)
+    print(f"[2] Merged {len(fs_cookies)} cookies from FlareSolverr into your session.", flush=True)
 
-    # Bearer phải khớp cookie GraphQL (*sb trong storage) — tính lại từ cookie sau merge
+    # Bearer must match GraphQL cookie (*sb in storage) — recalculated from cookie after merge
     merged_cookies = parse_cookie_header(merged)
     authorization = resolve_authorization_header(merged_cookies, auth_dir)
     src = describe_authorization_source(merged_cookies, auth_dir)
-    print(f"[2b] Authorization ← {src} (trên cookie đã merge)", flush=True)
+    print(f"[2b] Authorization ← {src} (on merged cookies)", flush=True)
 
     referer = (
         os.environ.get("UPWORK_GRAPHQL_REFERER", "").strip()
@@ -225,7 +225,7 @@ def main() -> None:
         "x-upwork-accept-language": "en-US",
         "User-Agent": ua,
     }
-    # sec-ch-ua Brave/Chrome giả có thể lệch UA thật của FlareSolverr → chỉ gửi khi bật rõ ràng
+    # Fake Brave/Chrome passwords can deviate from FlareSolverr's real UA → only send when explicitly enabled
     if os.environ.get("UPWORK_BROWSER_HINTS", "").strip().lower() in ("1", "true", "yes", "on"):
         headers.update(_browser_client_hints_headers())
     headers.update(_upwork_edge_headers(merged))
@@ -246,10 +246,10 @@ def main() -> None:
     body_preview = (gr.text or "")[:800]
     if gr.status_code == 403 and "Challenge" in body_preview and "text/html" in ct:
         print(
-            "\nCloudflare/Upwork trả trang «Challenge» (HTML), không phải JSON GraphQL.\n"
-            "Nguyên nhân thường gặp: cookie cf_clearance gắn với User-Agent của FlareSolverr — script đã dùng "
-            "UA từ FlareSolverr mặc định. Nếu bạn đặt UPWORK_UA khác, bỏ hoặc dùng cùng UA FlareSolverr.\n"
-            "Cách khác: POST GraphQL qua cùng session FlareSolverr (request.post + session) hoặc gọi API trong Playwright.",
+            "\nCloudflare/Upwork returns «Challenge» page (HTML), not JSON GraphQL.\n"
+            "Common cause: cf_clearance cookie associated with FlareSolverr's User-Agent — used script "
+            "UA from default FlareSolverr. If you set a different UPWORK_UA, leave it out or use the same FlareSolverr UA.\n"
+            "Alternative: POST GraphQL via the same FlareSolverr session (request.post + session) or call the API in Playwright.",
             file=sys.stderr,
         )
     if ct.startswith("application/json"):
@@ -257,14 +257,14 @@ def main() -> None:
             out = gr.json()
             if isinstance(out, dict) and out.get("errors"):
                 graphql_errors = True
-                print("GraphQL errors (không có data hoặc thiếu quyền field):", flush=True)
+                print("GraphQL errors (no data or missing field permissions):", flush=True)
                 err0 = (out.get("errors") or [{}])[0]
                 msg = str((err0 or {}).get("message") or "")
                 if "oAuth2 client does not have permission" in msg:
                     print(
-                        "\nGợi ý: Bearer phải trùng đúng cookie OAuth cho request này — trong capture log, "
-                        "DEBUG_TOKEN_MAP ghi rõ tên cookie (vd. 25897f9esb, có thể là *esb chứ không phải *fsb). "
-                        f"Nguồn Bearer hiện tại: {src}. Đặt bearer_cookie hoặc .auth/bearer.txt khớp log/DevTools.\n",
+                        "\nHint: Bearer must match the exact OAuth cookie for this request — in the capture log, "
+                        "DEBUG_TOKEN_MAP specifies the cookie name (e.g. 25897f9esb, probably *esb not *fsb)."
+                        f"Current Bearer source: {src}. Set bearer_cookie or .auth/bearer.txt to match log/DevTools.\n",
                         file=sys.stderr,
                     )
             text = json.dumps(out, indent=2, ensure_ascii=False)

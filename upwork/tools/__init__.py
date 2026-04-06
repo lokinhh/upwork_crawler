@@ -1,1 +1,1 @@
-"""CLI / tiện ích (đăng nhập Playwright, …)."""
+"""CLI utilities (Playwright login, etc.)."""

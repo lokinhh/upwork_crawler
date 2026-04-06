@@ -1,4 +1,4 @@
-"""Đọc .auth/ (storage_state, auth_config) và suy Bearer cho GraphQL."""
+"""Read .auth/ (storage_state, auth_config) and resolve Bearer for GraphQL."""
 
 from .loader import (
     default_auth_dir,

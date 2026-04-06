@@ -14,7 +14,7 @@ class GeminiClient:
         if not api_keys:
             raise ValueError("GeminiClient requires at least one API key")
 
-        # Loại bỏ key trống và trùng lặp, giữ nguyên thứ tự
+        # Remove empty and duplicate keys while preserving order.
         seen = set()
         cleaned: List[str] = []
         for k in api_keys:
@@ -44,29 +44,29 @@ class GeminiClient:
 
         extra_lines = []
         if job_type:
-            extra_lines.append(f"- Loại job: {job_type}")
+            extra_lines.append(f"- Job type: {job_type}")
         if experience_level:
-            extra_lines.append(f"- Kinh nghiệm mong muốn: {experience_level}")
+            extra_lines.append(f"- Desired experience level: {experience_level}")
         if budget:
-            extra_lines.append(f"- Ngân sách hiển thị: {budget}")
+            extra_lines.append(f"- Displayed budget: {budget}")
 
         extra_text = ""
         if extra_lines:
-            extra_text = "Thông tin thêm về job:\n" + "\n".join(extra_lines) + "\n\n"
+            extra_text = "Additional job information:\n" + "\n".join(extra_lines) + "\n\n"
 
         prompt = (
-            "Bạn là trợ lý tư vấn freelancer.\n"
-            "Hãy tóm tắt nhanh một job trên Upwork bằng tiếng Việt, ngắn gọn để giúp quyết định có nên apply hay không.\n\n"
-            "Trả về đúng định dạng sau:\n"
-            "- Tóm tắt: ...\n"
-            "- Yêu cầu chính: ...\n"
-            "- Ngân sách/Rate: ...\n"
-            "- Độ phù hợp (0-10): ...\n"
-            "- Rủi ro cần lưu ý: ...\n\n"
-            f"Tiêu đề: {job.get('title', '')}\n"
-            f"Mô tả: {job.get('description', '')}\n"
+            "You are a freelancer advisory assistant.\n"
+            "Summarize an Upwork job in Vietnamese, briefly, to help decide whether to apply.\n\n"
+            "Return exactly this format:\n"
+            "- Summary: ...\n"
+            "- Main requirements: ...\n"
+            "- Budget/Rate: ...\n"
+            "- Fit score (0-10): ...\n"
+            "- Risks to note: ...\n\n"
+            f"Title: {job.get('title', '')}\n"
+            f"Description: {job.get('description', '')}\n"
             f"Link: {job.get('link', '')}\n"
-            f"Ngày đăng: {job.get('published', '')}\n"
+            f"Posted date: {job.get('published', '')}\n"
             f"{extra_text}"
         )
 
@@ -130,4 +130,4 @@ class GeminiClient:
                 self._rotate_key()
 
         LOGGER.error("Gemini summarize failed after %s attempts: %s", max_attempts, last_error)
-        return "Khong the tom tat tu dong cho job nay (loi Gemini hoac het quota API key)."
+        return "Cannot summarize this job automatically (Gemini error or API key quota exhausted)."
