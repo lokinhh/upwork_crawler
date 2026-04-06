@@ -26,7 +26,7 @@ services:
       LOG_LEVEL: info
     restart: unless-stopped
 
-  # Image: https://github.com/users/decolua/packages/container/package/9router — có thể ghim tag (vd. :3cf900a) thay vì :latest
+  # Image: https://github.com/users/decolua/packages/container/package/9router — can pin tag (e.g. :3cf900a) instead of :latest
   ninerouter:
     image: ghcr.io/decolua/9router:latest
     container_name: upwork-ninerouter
@@ -58,7 +58,7 @@ services:
       context: .
       dockerfile: Dockerfile.crawler
     container_name: upwork-crawler
-    # Playwright/Chromium: tránh crash khi headless (tuỳ máy có thể bỏ)
+    # Playwright/Chromium: avoid crashes when headless (can be removed depending on the device)
     shm_size: "1gb"
     env_file:
       - .env
@@ -71,7 +71,7 @@ services:
       NINEROUTER_API_KEY: ${NINEROUTER_API_KEY:-sk_9router}
       SEEN_STORE_PATH: /app/data/.seen_jobs.json
       TELEGRAM_SUBSCRIBERS_STORE_PATH: /app/data/.telegram_subscribers.json
-      # Trùng volume bên dưới — login lưu storage_state.json; không mount = mỗi lần recreate container phải login lại
+      # Duplicate volume below — login save storage_state.json; no mount = every time the container recreates, you have to login again
       UPWORK_AUTH_DIR: /app/.auth
       LOG_DIR: /app/logs
       UPWORK_LOG_DIR: /app/logs
@@ -80,7 +80,7 @@ services:
       - crawler_auth:/app/.auth
       - ./logs:/app/logs
       # Logs persist ra host: ./logs
-      # Tuỳ chọn: thay volume bằng thư mục host (dễ sửa bearer) — mkdir .auth trước
+      # Optional: replace volume with host directory (easy to edit bearer) — mkdir .auth first
       # - ./.auth:/app/.auth
       # Neu dung Gemini + file key: tao api_key_gemini.txt roi bo comment dong duoi
       # - ./api_key_gemini.txt:/app/api_key_gemini.txt:ro

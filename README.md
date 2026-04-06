@@ -1,27 +1,27 @@
 # Upwork Scanner → Telegram
 
-Ứng dụng Python chạy vòng lặp: lấy job từ **Upwork qua GraphQL** (`userJobSearch`), lọc job mới, **tóm tắt bằng LLM**, rồi gửi tin qua **Telegram bot** cho mọi chat đã `/start`.
+The Python application runs in a loop: retrieve jobs from **Upwork via GraphQL** (`userJobSearch`), filter new jobs, **summarize using LLM**, then send messages via **Telegram bot** to all chats that have `/started`.
 
-Luồng tóm tắt: **9Router** (nếu có `NINEROUTER_MODEL`) → **OpenRouter** → **Gemini** — xem `upwork/clients/summarizer.py`.
+Summary flow: **9Router** (if `NINEROUTER_MODEL` exists) → **OpenRouter** → **Gemini** — see `upwork/clients/summarizer.py`.
 
-## Cách hoạt động (thực tế trong code)
+## How it works (actually in code)
 
-1. **Lấy job**: chỉ **GraphQL** + **FlareSolverr** (vượt Cloudflare) + thư mục **`.auth/`** (cookie / Playwright `storage_state.json`). Không còn scrape HTML trong scanner; `upwork/fetchers/scrape.py` là phần cũ, scanner không gọi.
-2. **Trùng lặp**: `SeenStore` (mặc định `.seen_jobs.json`).
-3. **Telegram**: đồng bộ subscriber qua `getUpdates`; `TELEGRAM_CHAT_ID` để trống / `*` / `all` = gửi cho tất cả đã `/start`.
-4. **Ghi log**: mặc định `logs/upwork_scanner.log` (có thể đổi bằng `UPWORK_LOG_DIR`, `UPWORK_LOG_FILE`, `UPWORK_LOG_LEVEL`).
+1. **Get job**: just **GraphQL** + **FlareSolverr** (over Cloudflare) + **`.auth/`** folder (cookie / Playwright `storage_state.json`). No more scraping HTML in scanner; `upwork/fetchers/scrape.py` is old, scanner is not called.
+2. **Duplicate**: `SeenStore` (default `.seen_jobs.json`).
+3. **Telegram**: synchronize subscribers via `getUpdates`; `TELEGRAM_CHAT_ID` blank / `*` / `all` = send to all already `/start`.
+4. **Logging**: default `logs/upwork_scanner.log` (can be changed with `UPWORK_LOG_DIR`, `UPWORK_LOG_FILE`, `UPWORK_LOG_LEVEL`).
 
-> **`UPWORK_FEED_URL` (RSS)**: vẫn có trong `Config` để thỏa “ít nhất một nguồn” khi validate env, nhưng **vòng quét hiện không đọc RSS** — cần **`UPWORK_SEARCH_KEYWORD`** và **`FLARESOLVERR_URL`** thì mới fetch được job.
+> **`UPWORK_FEED_URL` (RSS)**: still present in `Config` to satisfy “at least one source” when validating env, but **scan loop does not currently read RSS** — needs **`UPWORK_SEARCH_KEYWORD`** and **`FLARESOLVERR_URL`** to fetch the job.
 
-Chi tiết module và sơ đồ: **`ARCHITECTURE.md`**.
+Module details and diagram: **`ARCHITECTURE.md`**.
 
-## Yêu cầu
+## Request
 
-- Python 3.11+ (khuyến nghị; image Docker dùng 3.11).
-- [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) đang chạy (local hoặc Docker) nếu dùng tìm kiếm theo keyword.
-- Playwright Chromium (login Upwork): `pip install playwright` rồi `playwright install chromium`.
+- Python 3.11+ (recommended; Docker images use 3.11).
+- [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) is running (local or Docker) if using keyword search.
+- Playwright Chromium (login Upwork): `pip install playwright` then `playwright install chromium`.
 
-## Cài đặt
+## Setting
 
 ```bash
 python3 -m venv .venv
@@ -30,76 +30,76 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
-## Cấu hình
+## Configuration
 
 ```bash
 cp .env.example .env
 ```
 
-Biến bắt buộc / cần cho chạy thực tế:
+Required variables / needed for actual run:
 
-| Nhóm | Biến | Ghi chú |
+| Group | Variable | Notes |
 |------|------|---------|
-| Job | `UPWORK_SEARCH_KEYWORD` | Từ khóa hoặc nhiều mục cách nhau bằng dấu phẩy; có thể là URL trang search Upwork — xử lý trong `fetchers/keyword.py`. |
-| Job | `FLARESOLVERR_URL` | Ví dụ `http://localhost:8191`. Trong Docker Compose crawler đã override thành `http://flaresolverr:8191`. |
-| Telegram | `TELEGRAM_BOT_TOKEN` | Token từ BotFather. |
-| Tóm tắt | Một trong các cách | `NINEROUTER_MODEL` (+ tùy chọn `NINEROUTER_BASE_URL`, `NINEROUTER_API_KEY`), hoặc `OPENROUTER_API_KEY` + `OPENROUTER_MODEL`, hoặc `GEMINI_API_KEY` / file `api_key_gemini.txt` (mỗi dòng một key). |
+| Job | `UPWORK_SEARCH_KEYWORD` | Keywords or multiple entries separated by commas; can be the Upwork search page URL — handled in `fetchers/keyword.py`. |
+| Job | `FLARESOLVERR_URL` | For example `http://localhost:8191`. In Docker Compose crawler has overridden to `http://flaresolverr:8191`. |
+| Telegram | `TELEGRAM_BOT_TOKEN` | Tokens from BotFather. |
+| Summary | One of the ways | `NINEROUTER_MODEL` (+ options `NINEROUTER_BASE_URL`, `NINEROUTER_API_KEY`), or `OPENROUTER_API_KEY` + `OPENROUTER_MODEL`, or `GEMINI_API_KEY` / file `api_key_gemini.txt` (one key per line). |
 
-Đăng nhập Upwork (lần đầu hoặc khi hết phiên):
+Log in to Upwork (first time or when session ends):
 
-- `UPWORK_EMAIL` / `UPWORK_PASSWORD`, và tùy chọn `UPWORK_AUTO_LOGIN`, `UPWORK_LOGIN_FORM`, `UPWORK_AUTH_DIR` (mặc định `./.auth`).
-- Có thể chạy thủ công: `python -m upwork.tools.login_via_flaresolverr` (xem comment trong `.env.example`).
+- `UPWORK_EMAIL` / `UPWORK_PASSWORD`, and options `UPWORK_AUTO_LOGIN`, `UPWORK_LOGIN_FORM`, `UPWORK_AUTH_DIR` (default `./.auth`).
+- Can be run manually: `python -m upwork.tools.login_via_flaresolverr` (see comment in `.env.example`).
 
-Biến tùy chọn khác (một phần): `POLL_INTERVAL_SECONDS` (trong `.env.example` mặc định 300), `SEEN_STORE_PATH`, `TELEGRAM_SUBSCRIBERS_STORE_PATH`, `UPWORK_GRAPHQL_SORT`, `UPWORK_GRAPHQL_PAGE_SIZE`, `UPWORK_GRAPHQL_403_MAX_RETRIES`, `FLARESOLVERR_TIMEOUT_MS`, `GEMINI_MODEL`, v.v. — đầy đủ trong **`.env.example`**.
+Other (partial) optional variables: `POLL_INTERVAL_SECONDS` (in `.env.example` default 300), `SEEN_STORE_PATH`, `TELEGRAM_SUBSCRIBERS_STORE_PATH`, `UPWORK_GRAPHQL_SORT`, `UPWORK_GRAPHQL_PAGE_SIZE`, `UPWORK_GRAPHQL_403_MAX_RETRIES`, `FLARESOLVERR_TIMEOUT_MS`, `GEMINI_MODEL`, etc. — full in **`.env.example`**.
 
-## Chạy local
+## Run locally
 
-Bật FlareSolverr, cấu hình `.env`, rồi:
+Enable FlareSolverr, configure `.env`, then:
 
 ```bash
 python upwork_scanner.py
 ```
 
-hoặc:
+or:
 
 ```bash
 python -m upwork.main
 ```
 
-(Lệnh phải chạy từ **thư mục gốc repo** để import package `upwork`.)
+(Command must be run from **repo root directory** to import package `upwork`.)
 
-## Chạy bằng Docker Compose
+## Runs using Docker Compose
 
 Stack: **FlareSolverr** + **9Router** (image `ghcr.io/decolua/9router:latest`) + **crawler** (`Dockerfile.crawler`).
 
 ```bash
 cp .env.example .env
-# Điền TELEGRAM_BOT_TOKEN, UPWORK_SEARCH_KEYWORD, và backend tóm tắt (ví dụ NINEROUTER_MODEL trong .env)
+# Fill in TELEGRAM_BOT_TOKEN, UPWORK_SEARCH_KEYWORD, and summary backend (e.g. NINEROUTER_MODEL in .env)
 docker compose up -d --build
 ```
 
 - FlareSolverr: `http://localhost:8191`
-- 9Router: `http://localhost:20128` — biến dịch vụ nằm trong `docker-compose.yml` (`ninerouter.environment`); có thể ghi đè qua `.env` gốc (tiền tố `NINEROUTER_*`, xem `.env.example`).
+- 9Router: `http://localhost:20128` — service variable located in `docker-compose.yml` (`ninerouter.environment`); can be overridden via the original `.env` (prefix `NINEROUTER_*`, see `.env.example`).
 - Volume: `crawler_data` (seen + subscribers), `crawler_auth` (`.auth` trong container), mount `./logs` → `/app/logs`.
 
-## Cấu trúc thư mục (gỡ lỗi)
+## Directory structure (debug)
 
 ```
 .
-├── upwork_scanner.py          # Entry: gọi upwork.main.main()
+├── upwork_scanner.py # Entry: call upwork.main.main()
 ├── requirements.txt
 ├── docker-compose.yml
 ├── Dockerfile.crawler
 ├── .env.example
 ├── ARCHITECTURE.md
 └── upwork/
-    ├── main.py                # Nối Config, stores, clients, chạy UpworkScanner
+    ├── main.py # Connect Config, stores, clients, run UpworkScanner
     ├── config.py
-    ├── scanner.py             # Vòng lặp: sync Telegram → fetch → tóm tắt → gửi
-    ├── session/ensure.py     # Chuẩn bị phiên GraphQL / login
-    ├── auth/                   # Đọc storage_state, Bearer, cookie
+    ├── scanner.py # Loop: sync Telegram → fetch → summary → send
+    ├── session/ensure.py # Prepare GraphQL session/login
+    ├── auth/ # Read storage_state, Bearer, cookies
     ├── fetchers/
-    │   ├── jobs.py            # Gọi GraphQL theo keyword
+    │ ├── jobs.py # Call GraphQL by keyword
     │   ├── graphql_search.py  # POST userJobSearch + FlareSolverr
     │   └── keyword.py
     ├── clients/
@@ -113,8 +113,8 @@ docker compose up -d --build
         └── login_via_flaresolverr.py
 ```
 
-## Lưu ý
+## Note
 
-- Upwork **không còn RSS chính thức** như trước; nguồn ổn định trong project này là **GraphQL + FlareSolverr + `.auth`**.
-- File **`.seen_jobs.json`** (hoặc đường dẫn bạn đặt) ghi nhớ job đã gửi; **`.telegram_subscribers.json`** lưu subscriber và `last_update_id`.
-- Khi đổi cách tóm tắt, sửa prompt trong từng client (`gemini`, `openrouter`, `ninerouter`) hoặc luồng trong `SummarizerClient`.
+- Upwork **no longer has official RSS** like before; The stable source in this project is **GraphQL + FlareSolverr + `.auth`**.
+- File **`.seen_jobs.json`** (or the path you set) remembers the submitted job; **`.telegram_subscribers.json`** stores subscribers and `last_update_id`.
+- When changing the summary method, edit the prompt in each client (`gemini`, `openrouter`, `ninerouter`) or thread in `SummarizerClient`.

@@ -3,5 +3,5 @@ python-dotenv
 requests
 curl_cffi
 beautifulsoup4
-# Login Upwork (Playwright form) — Docker: build image sau khi thêm dòng này
+# Login Upwork (Playwright form) — Docker: build image after adding this line
 playwright>=1.40.0

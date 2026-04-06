@@ -1,6 +1,6 @@
 """
-Entry point tương thích: python upwork_scanner.py (như trước).
-Chuyển sang package upwork, gọi upwork.main.main().
+Compatible entry point: python upwork_scanner.py (as before).
+Switch to the upwork package, call upwork.main.main().
 """
 import sys
 from pathlib import Path
